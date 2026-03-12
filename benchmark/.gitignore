@@ -1,0 +1,51 @@
+# IDE
+.idea/
+.vscode/
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+
+# Virtual environments
+
+.venv/
+.env
+.env
+.env.*
+
+# AI/ML & LangGraph
+*.pkl
+*.pickle
+*.model
+*.weights
+*.ckpt
+*.pth
+*.bin
+wandb/
+mlruns/
+.mlflow/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+
+uv.lock
+
+#Ignore vscode AI rules
+.github/instructions/codacy.instructions.md
+.venv/
+
+
+tests/benchmark/results/
