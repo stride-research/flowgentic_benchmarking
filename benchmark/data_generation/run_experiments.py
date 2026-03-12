@@ -82,8 +82,12 @@ async def main():
 
 	benchmark = FlowGenticBenchmarkManager()
 
+	# Experiment 1
+
 	# Experiment 2
 	benchmark.register_experiment("syntethic_adaptive", SynthethicAdaptive)
+
+	# Experiment 3 
 
 	# Execution of experiments
 	await benchmark.run_registerd_experiments()

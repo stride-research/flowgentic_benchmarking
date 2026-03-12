@@ -53,6 +53,38 @@ def _extract_event_durations(events: List[Dict]) -> Dict[str, List[float]]:
 	return durations
 
 
+def _aggregate_records_by_slots(
+	records: List[Dict],
+) -> Tuple[List[int], List[float], List[float], List[Dict]]:
+	"""
+	Group records by n_of_backend_slots and compute mean/std of total_makespan.
+
+	Returns:
+		(backend_slots, mean_makespans, std_makespans, representative_records)
+		representative_records: one record per slot count (first of each group),
+		useful for extracting metadata and events.
+	"""
+	from collections import defaultdict
+
+	groups: Dict[int, List[Dict]] = defaultdict(list)
+	for r in records:
+		groups[r["n_of_backend_slots"]].append(r)
+
+	backend_slots = sorted(groups.keys())
+	mean_makespans = []
+	std_makespans = []
+	representative_records = []
+
+	for slots in backend_slots:
+		group = groups[slots]
+		makespans = [r["total_makespan"] for r in group]
+		mean_makespans.append(float(np.mean(makespans)))
+		std_makespans.append(float(np.std(makespans, ddof=1)) if len(makespans) > 1 else 0.0)
+		representative_records.append(group[0])
+
+	return backend_slots, mean_makespans, std_makespans, representative_records
+
+
 def _compute_overhead_metrics(records: List[Dict]) -> Dict[str, List]:
 	"""
 	Compute overhead metrics across all records.
@@ -148,30 +180,45 @@ class SyntheticAdaptivePlotter(BasePlotter):
 			logger.warning(f"No records for {experiment_name}, skipping plots.")
 			return
 
-		# Sort by backend slots to ensure correct ordering
-		sorted_records = sorted(records, key=lambda r: r["n_of_backend_slots"])
-
-		# Extract data
-		backend_slots = [r["n_of_backend_slots"] for r in sorted_records]
-		makespans = [r["total_makespan"] for r in sorted_records]
+		# Aggregate records by backend slots (handles multiple runs)
+		backend_slots, makespans, makespan_stds, repr_records = (
+			_aggregate_records_by_slots(records)
+		)
+		has_error_bars = any(s > 0 for s in makespan_stds)
 
 		# Calculate speedup and efficiency using relative parallelism
 		p_min = backend_slots[0]
-		t_baseline = makespans[0]  # Baseline: makespan with smallest slot count
+		t_baseline = makespans[0]
 		speedups = [t_baseline / t_p for t_p in makespans]
-		# Relative parallelism factor: how many times more slots vs baseline
 		relative_p = [p / p_min for p in backend_slots]
 		efficiencies = [s / rp for s, rp in zip(speedups, relative_p)]
 
+		# Propagate errors: speedup = t_baseline / t_p
+		# sigma_speedup = speedup * sqrt((sigma_base/t_base)^2 + (sigma_p/t_p)^2)
+		speedup_errors = None
+		efficiency_errors = None
+		makespan_errors = makespan_stds if has_error_bars else None
+		if has_error_bars:
+			speedup_errors = [
+				sp * np.sqrt(
+					(makespan_stds[0] / t_baseline) ** 2 + (s_p / t_p) ** 2
+				)
+				for sp, t_p, s_p in zip(speedups, makespans, makespan_stds)
+			]
+			efficiency_errors = [
+				se / rp
+				for se, rp in zip(speedup_errors, relative_p)
+			]
+
 		# Get metadata for titles
-		run_name = sorted_records[0].get("run_name", "unknown")
-		n_agents = sorted_records[0].get("n_of_agents", "?")
-		n_tools = sorted_records[0].get("n_of_tool_calls_per_agent", "?")
+		n_agents = repr_records[0].get("n_of_agents", "?")
+		n_tools = repr_records[0].get("n_of_tool_calls_per_agent", "?")
 		N_total = (
 			n_agents * n_tools
 			if isinstance(n_agents, int) and isinstance(n_tools, int)
 			else "?"
 		)
+		n_runs = repr_records[0].get("number_of_runs", 1)
 
 		# Create subdirectory for strong scaling makespan plots
 		makespan_subdir = "strong_scaling/makespan"
@@ -181,6 +228,8 @@ class SyntheticAdaptivePlotter(BasePlotter):
 		subtitle = f"N={N_total}, {n_agents} agents × {n_tools} tools/agent"
 		if baseline_note:
 			subtitle += f", {baseline_note}"
+		if n_runs > 1:
+			subtitle += f", {n_runs} runs"
 
 		# Plot speedup (relative to baseline)
 		self._create_scaling_plot(
@@ -191,8 +240,9 @@ class SyntheticAdaptivePlotter(BasePlotter):
 			ylabel=f"Speedup (T(p₀)/T(p))",
 			filename="speedup.png",
 			subdirectory=makespan_subdir,
-			ideal_line=relative_p,  # Ideal speedup = p/p_min (linear)
+			ideal_line=relative_p,
 			ideal_label="Ideal (linear)",
+			y_errors=speedup_errors,
 		)
 
 		# Plot efficiency
@@ -204,9 +254,10 @@ class SyntheticAdaptivePlotter(BasePlotter):
 			ylabel="Efficiency (Speedup / (p/p₀))",
 			filename="efficiency.png",
 			subdirectory=makespan_subdir,
-			ideal_line=[1.0] * len(backend_slots),  # Ideal efficiency = 1
+			ideal_line=[1.0] * len(backend_slots),
 			ideal_label="Ideal (100%)",
 			y_max=1.1,
+			y_errors=efficiency_errors,
 		)
 
 		# Also plot raw makespan for reference
@@ -218,6 +269,7 @@ class SyntheticAdaptivePlotter(BasePlotter):
 			ylabel="Makespan (seconds)",
 			filename="makespan.png",
 			subdirectory=makespan_subdir,
+			y_errors=makespan_errors,
 		)
 
 		logger.info(f"Generated strong scaling makespan plots in {makespan_subdir}/")
@@ -239,32 +291,48 @@ class SyntheticAdaptivePlotter(BasePlotter):
 			logger.warning(f"No records for {experiment_name}, skipping plots.")
 			return
 
-		# Sort by backend slots
-		sorted_records = sorted(records, key=lambda r: r["n_of_backend_slots"])
-
-		# Extract data
-		backend_slots = [r["n_of_backend_slots"] for r in sorted_records]
-		makespans = [r["total_makespan"] for r in sorted_records]
+		# Aggregate records by backend slots (handles multiple runs)
+		backend_slots, makespans, makespan_stds, repr_records = (
+			_aggregate_records_by_slots(records)
+		)
+		has_error_bars = any(s > 0 for s in makespan_stds)
 
 		# Calculate weak scaling metrics using relative parallelism
 		p_min = backend_slots[0]
 		t_baseline = makespans[0]
 		relative_p = [p / p_min for p in backend_slots]
-		# Weak scaling efficiency: T(p_min)/T(p) - should stay near 1 if scaling well
 		efficiencies = [t_baseline / t_p for t_p in makespans]
-		# Scaled speedup: how much faster vs sequential execution of scaled workload
 		scaled_speedups = [
 			rp * t_baseline / t_p for rp, t_p in zip(relative_p, makespans)
 		]
 
+		# Propagate errors
+		efficiency_errors = None
+		speedup_errors = None
+		if has_error_bars:
+			efficiency_errors = [
+				eff * np.sqrt(
+					(makespan_stds[0] / t_baseline) ** 2 + (s_p / t_p) ** 2
+				)
+				for eff, t_p, s_p in zip(efficiencies, makespans, makespan_stds)
+			]
+			speedup_errors = [
+				ss * np.sqrt(
+					(makespan_stds[0] / t_baseline) ** 2 + (s_p / t_p) ** 2
+				)
+				for ss, t_p, s_p in zip(scaled_speedups, makespans, makespan_stds)
+			]
+
 		# Get metadata for titles
-		run_name = sorted_records[0].get("run_name", "unknown")
-		n_agents = sorted_records[0].get("n_of_agents", "?")
+		n_agents = repr_records[0].get("n_of_agents", "?")
+		n_runs = repr_records[0].get("number_of_runs", 1)
 
 		# Create subdirectory for weak scaling makespan plots
 		makespan_subdir = "weak_scaling/makespan"
 		baseline_note = f", p₀={p_min}" if p_min > 1 else ""
 		subtitle = f"{n_agents} agents, workload ∝ p{baseline_note}"
+		if n_runs > 1:
+			subtitle += f", {n_runs} runs"
 
 		# Plot efficiency
 		self._create_scaling_plot(
@@ -278,6 +346,7 @@ class SyntheticAdaptivePlotter(BasePlotter):
 			ideal_line=[1.0] * len(backend_slots),
 			ideal_label="Ideal (100%)",
 			y_max=1.1,
+			y_errors=efficiency_errors,
 		)
 
 		# Plot scaled speedup
@@ -291,6 +360,7 @@ class SyntheticAdaptivePlotter(BasePlotter):
 			subdirectory=makespan_subdir,
 			ideal_line=relative_p,
 			ideal_label="Ideal (linear)",
+			y_errors=speedup_errors,
 		)
 
 		logger.info(f"Generated weak scaling makespan plots in {makespan_subdir}/")
@@ -307,8 +377,9 @@ class SyntheticAdaptivePlotter(BasePlotter):
 		ideal_line: Optional[List[float]] = None,
 		ideal_label: str = "Ideal",
 		y_max: Optional[float] = None,
+		y_errors: Optional[List[float]] = None,
 	) -> None:
-		"""Create a single scaling plot with optional ideal reference line."""
+		"""Create a single scaling plot with optional ideal reference line and error bars."""
 		fig, ax = plt.subplots(figsize=(8, 6))
 
 		# Set logarithmic x-axis, then pin ticks to exact data points only
@@ -319,8 +390,15 @@ class SyntheticAdaptivePlotter(BasePlotter):
 		)
 		ax.xaxis.set_minor_locator(mticker.NullLocator())
 
-		# Plot actual values
-		ax.plot(x_values, y_values, "bo-", linewidth=2, markersize=8, label="Measured")
+		# Plot actual values (with error bars if available)
+		if y_errors is not None:
+			ax.errorbar(
+				x_values, y_values, yerr=y_errors,
+				fmt="bo-", linewidth=2, markersize=8, capsize=4,
+				capthick=1.5, label="Measured (mean ± std)",
+			)
+		else:
+			ax.plot(x_values, y_values, "bo-", linewidth=2, markersize=8, label="Measured")
 
 		# Plot ideal line if provided
 		if ideal_line is not None:
@@ -390,12 +468,13 @@ class SyntheticAdaptivePlotter(BasePlotter):
 		if not records:
 			return
 
-		sorted_records = sorted(records, key=lambda r: r["n_of_backend_slots"])
-		metrics = _compute_overhead_metrics(sorted_records)
+		# Use representative records (one per slot count) for overhead analysis
+		_, _, _, repr_records = _aggregate_records_by_slots(records)
+		metrics = _compute_overhead_metrics(repr_records)
 		overhead_subdir = f"{scaling_type}/overhead"
 
-		n_agents = sorted_records[0].get("n_of_agents", "?")
-		n_tools = sorted_records[0].get("n_of_tool_calls_per_agent", "?")
+		n_agents = repr_records[0].get("n_of_agents", "?")
+		n_tools = repr_records[0].get("n_of_tool_calls_per_agent", "?")
 		subtitle = f"({n_agents} agents, {n_tools} tool calls/agent)"
 
 		# 1. Total compilation time vs backend slots
@@ -488,60 +567,81 @@ class SyntheticAdaptivePlotter(BasePlotter):
 		if not records:
 			return
 
-		sorted_records = sorted(records, key=lambda r: r["n_of_backend_slots"])
-		metrics = _compute_overhead_metrics(sorted_records)
+		# Aggregate by slots for multi-run support
+		backend_slots, mean_makespans, makespan_stds, repr_records = (
+			_aggregate_records_by_slots(records)
+		)
+		has_error_bars = any(s > 0 for s in makespan_stds)
+
+		# Use representative records for task counts (same workload config per slot)
+		metrics = _compute_overhead_metrics(repr_records)
 		throughput_subdir = f"{scaling_type}/throughput"
 
-		n_agents = sorted_records[0].get("n_of_agents", "?")
-		n_tools = sorted_records[0].get("n_of_tool_calls_per_agent", "?")
+		n_agents = repr_records[0].get("n_of_agents", "?")
+		n_tools = repr_records[0].get("n_of_tool_calls_per_agent", "?")
+		n_runs = repr_records[0].get("number_of_runs", 1)
 		subtitle = f"({n_agents} agents, {n_tools} tool calls/agent)"
+		if n_runs > 1:
+			subtitle = f"({n_agents} agents, {n_tools} tool calls/agent, {n_runs} runs)"
 
-		# Calculate throughput metrics
-		# throughput = total_tasks / makespan
+		# Calculate throughput metrics using mean makespans
 		throughputs = [
 			n / ms if ms > 0 else 0
-			for n, ms in zip(metrics["total_tasks"], metrics["makespans"])
+			for n, ms in zip(metrics["total_tasks"], mean_makespans)
 		]
 
+		# Propagate errors: throughput = N/T, sigma_throughput = throughput * sigma_T / T
+		throughput_errors = None
+		if has_error_bars:
+			throughput_errors = [
+				(n / ms) * (s / ms) if ms > 0 else 0
+				for n, ms, s in zip(metrics["total_tasks"], mean_makespans, makespan_stds)
+			]
+
 		# 1. Aggregate throughput vs backend slots
-		# INTERPRETATION: Shows system capacity - should increase with slots
-		# Flattening indicates saturation or bottleneck
 		self._create_scaling_plot(
-			x_values=metrics["backend_slots"],
+			x_values=backend_slots,
 			y_values=throughputs,
 			title=f"Task Throughput\n{subtitle}",
 			xlabel="Number of Backend Slots (p)",
 			ylabel="Throughput (tasks/second)",
 			filename="throughput.png",
 			subdirectory=throughput_subdir,
+			y_errors=throughput_errors,
 		)
 
 		# 2. Throughput per slot (utilization efficiency)
-		# INTERPRETATION: Measures per-slot productivity
-		# Decreasing values indicate diminishing returns from adding slots
 		throughput_per_slot = [
-			t / s if s > 0 else 0 for t, s in zip(throughputs, metrics["backend_slots"])
+			t / s if s > 0 else 0 for t, s in zip(throughputs, backend_slots)
 		]
+		tps_errors = None
+		if throughput_errors is not None:
+			tps_errors = [
+				te / s if s > 0 else 0 for te, s in zip(throughput_errors, backend_slots)
+			]
 		self._create_scaling_plot(
-			x_values=metrics["backend_slots"],
+			x_values=backend_slots,
 			y_values=throughput_per_slot,
 			title=f"Throughput per Backend Slot\n{subtitle}",
 			xlabel="Number of Backend Slots (p)",
 			ylabel="Throughput per Slot (tasks/second/slot)",
 			filename="throughput_per_slot.png",
 			subdirectory=throughput_subdir,
+			y_errors=tps_errors,
 		)
 
 		# 3. Throughput scaling factor: actual vs ideal
-		# INTERPRETATION: Compares actual scaling to theoretical linear scaling
-		# Gap represents parallelization inefficiency (Amdahl's law effects)
 		if throughputs[0] > 0:
 			baseline_throughput = throughputs[0]
 			actual_scaling = [t / baseline_throughput for t in throughputs]
-			ideal_scaling = [float(s) for s in metrics["backend_slots"]]
+			ideal_scaling = [float(s) for s in backend_slots]
+
+			scaling_errors = None
+			if throughput_errors is not None:
+				scaling_errors = [te / baseline_throughput for te in throughput_errors]
 
 			self._create_scaling_plot(
-				x_values=metrics["backend_slots"],
+				x_values=backend_slots,
 				y_values=actual_scaling,
 				title=f"Throughput Scaling Factor\n{subtitle}",
 				xlabel="Number of Backend Slots (p)",
@@ -550,6 +650,7 @@ class SyntheticAdaptivePlotter(BasePlotter):
 				subdirectory=throughput_subdir,
 				ideal_line=ideal_scaling,
 				ideal_label="Ideal (linear)",
+				y_errors=scaling_errors,
 			)
 
 		logger.info(f"Generated throughput plots in {throughput_subdir}/")
