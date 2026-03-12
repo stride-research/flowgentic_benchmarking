@@ -36,3 +36,14 @@ benchmark: ## Run the experiments in the benchmarking
 
 benchmark-multiple-workloads: ## Run the full benchmark suite with multiple configs
 	$(VENV_ACTIVATE) && python3 -m run_benchmark_suite
+
+sbatch-start: ## Starts batch for testing
+	sbatch tests/benchmark/submit_delta.sh
+
+cluster-debug: ## Starts interactive debug session
+	salloc --account=bebo-delta-gpu \
+		--partition=gpuA100x4-interactive \
+		--nodes=2 \
+		--ntasks-per-node=4 \
+		--gpus-per-node=1 \
+		--time=01:00:00
