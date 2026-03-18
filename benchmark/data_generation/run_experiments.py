@@ -13,6 +13,9 @@ from data_generation.experiments.base.base_experiment import (
 from data_generation.experiments.synthethic_adaptive.main import (
 	SynthethicAdaptive,
 )
+from data_generation.experiments.throughput_saturation.main import (
+	ThroughputSaturation,
+)
 from data_generation.utils.io_utils import IOUtils
 from data_generation.utils.schemas import (
 	BenchmarkConfig,
@@ -81,6 +84,9 @@ async def main():
 	"""Run all benchmarks"""
 
 	benchmark = FlowGenticBenchmarkManager()
+
+	# Throughput saturation experiment
+	benchmark.register_experiment("throughput_saturation", ThroughputSaturation)
 
 	# Experiment 2
 	benchmark.register_experiment("syntethic_adaptive", SynthethicAdaptive)
