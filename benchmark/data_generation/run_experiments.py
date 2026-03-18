@@ -13,6 +13,9 @@ from data_generation.experiments.base.base_experiment import (
 from data_generation.experiments.synthethic_adaptive.main import (
 	SynthethicAdaptive,
 )
+from data_generation.experiments.backend_comparison.main import (
+	BackendComparison,
+)
 from data_generation.utils.io_utils import IOUtils
 from data_generation.utils.schemas import (
 	BenchmarkConfig,
@@ -84,7 +87,8 @@ async def main():
 
 	# Experiment 2
 	benchmark.register_experiment("syntethic_adaptive", SynthethicAdaptive)
-
+	# Experiment 3
+	benchmark.register_experiment("backend_comparison", BackendComparison) 
 	# Execution of experiments
 	await benchmark.run_registerd_experiments()
 
