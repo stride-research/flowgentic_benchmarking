@@ -33,6 +33,7 @@ class BenchmarkConfig(BaseModel):
 	# 2) Edited by the benchmarking program
 	workload_type: WorkloadType = WorkloadType.FIXED_AGENTS_VARY_TOOLS
 	tool_execution_duration_time: int
+	number_of_runs: int = 1
 
 
 class WorkloadConfig(BaseModel):
@@ -55,3 +56,4 @@ class BenchmarkedRecord(BenchmarkConfig):
 
 	total_makespan: float
 	events: List[Dict[str, Any]]  # Profiling events from the engine
+	run_index: int = 0

@@ -1,3 +1,4 @@
+import mimetypes
 from pathlib import Path
 import shutil
 import yaml
@@ -37,6 +38,7 @@ class IOUtils:
 		n_of_tool_calls_per_agent = int(environment["n_of_tool_calls_per_agent"])
 		n_of_backend_slots = int(environment["n_of_backend_slots"])
 		tool_execution_duration_time = int(environment["tool_execution_duration_time"])
+		number_of_runs = int(environment.get("number_of_runs", 1))
 
 		return BenchmarkConfig(
 			run_name=run_name,
@@ -46,6 +48,7 @@ class IOUtils:
 			n_of_tool_calls_per_agent=n_of_tool_calls_per_agent,
 			n_of_backend_slots=n_of_backend_slots,
 			tool_execution_duration_time=tool_execution_duration_time,
+			number_of_runs=number_of_runs,
 		)
 
 	def _create_core_directories(self, run_configuration_name: str):
@@ -89,18 +92,18 @@ class DiscordNotifier:
 	def __init__(self):
 		self.webhook_url = os.getenv("DISCORD_WEBHOOK")
 	
-	def send_discord_notification(self, msg: str, image_path: str = None):
+	def send_discord_notification(self, msg: str, file_path: str = None):
 		if not self.webhook_url:
 			return None
 		
 		payload = {"content": msg}
 		
-		if image_path and os.path.exists(image_path):
-			with open(image_path, "rb") as f:
+		if file_path and os.path.exists(file_path):
+			mime_type = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
+			with open(file_path, "rb") as f:
 				files = {
-					"file": (os.path.basename(image_path), f, "image/png")
+					"file": (os.path.basename(file_path), f, mime_type)
 				}
-				# Send both data (text) and files (image)
 				response = requests.post(self.webhook_url, data=payload, files=files)
 		else:
 			response = requests.post(self.webhook_url, json=payload)
