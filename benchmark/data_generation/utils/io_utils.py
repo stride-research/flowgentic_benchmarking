@@ -1,3 +1,4 @@
+import mimetypes
 from pathlib import Path
 import shutil
 import yaml
@@ -91,18 +92,18 @@ class DiscordNotifier:
 	def __init__(self):
 		self.webhook_url = os.getenv("DISCORD_WEBHOOK")
 	
-	def send_discord_notification(self, msg: str, image_path: str = None):
+	def send_discord_notification(self, msg: str, file_path: str = None):
 		if not self.webhook_url:
 			return None
 		
 		payload = {"content": msg}
 		
-		if image_path and os.path.exists(image_path):
-			with open(image_path, "rb") as f:
+		if file_path and os.path.exists(file_path):
+			mime_type = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
+			with open(file_path, "rb") as f:
 				files = {
-					"file": (os.path.basename(image_path), f, "image/png")
+					"file": (os.path.basename(file_path), f, mime_type)
 				}
-				# Send both data (text) and files (image)
 				response = requests.post(self.webhook_url, data=payload, files=files)
 		else:
 			response = requests.post(self.webhook_url, json=payload)

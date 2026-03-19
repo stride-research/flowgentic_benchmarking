@@ -1,8 +1,10 @@
 from abc import ABC, abstractmethod
 import json
+import tarfile
 from typing import Any, Dict, List
 import logging
 
+from data_generation.utils.io_utils import DiscordNotifier
 from data_generation.utils.schemas import WorkloadConfig, WorkloadResult
 from data_generation.workload.base_workload import BaseWorkload
 from data_generation.workload.utils.engine import resolve_engine
@@ -62,6 +64,20 @@ class BaseExperiment(ABC):
 		logger.info(f"✓ Results saved to {self.data_dir}")
 
 	def load_data_from_disk(self) -> Dict[Any, Any]:
-		"""Load results from disk."""
-		with open(self.data_dir / "data.json", "r") as f:
-			return json.load(f)
+		"""Load results from disk, compress, and send a Discord notification."""
+		data_file = self.data_dir / "data.json"
+		with open(data_file, "r") as f:
+			data = json.load(f)
+
+		tar_path = self.data_dir / "data.tar.gz"
+		with tarfile.open(tar_path, "w:gz") as tar:
+			tar.add(data_file, arcname=data_file.name)
+		logger.info(f"✓ Compressed data to {tar_path}")
+
+		notifier = DiscordNotifier()
+		notifier.send_discord_notification(
+			msg=f"Experiment data ready: {self.data_dir.name}",
+			file_path=str(tar_path),
+		)
+
+		return data
