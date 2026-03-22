@@ -1,4 +1,5 @@
 from enum import Enum
+from pathlib import Path
 from typing import Any, Callable, Dict, Literal
 
 
@@ -43,9 +44,9 @@ class BackendComparison(BaseExperiment):
 	def __init__(
 		self, benchmark_config: BenchmarkConfig, data_dir: str, plots_dir: str
 	) -> None:
-		super().__init__(data_dir, plots_dir)
+		super().__init__(data_dir, Path(plots_dir))
 		self.benchmark_config = benchmark_config
-		self.plotter = BackendComparisonPlotter(plots_dir=plots_dir)
+		self.plotter = BackendComparisonPlotter(plots_dir=Path(plots_dir))
 		self.results: Dict[str, Any] = {}
 
 	async def _run_for_engine(

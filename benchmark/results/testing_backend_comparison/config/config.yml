@@ -1,7 +1,7 @@
 environment:
-  n_of_agents: 2
-  n_of_backend_slots: 3
-  n_of_tool_calls_per_agent: 4
+  n_of_agents: 6
+  n_of_backend_slots: 4
+  n_of_tool_calls_per_agent: 10
   tool_execution_duration_time: 3
 run_description: 'Debugging AsyncFlow vs Parsl in the new flowgentic benchmarking repo!'
 run_name: testing_backend_comparison

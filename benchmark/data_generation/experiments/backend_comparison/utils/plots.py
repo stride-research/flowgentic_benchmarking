@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.patches import Patch
 
 from data_generation.experiments.base.base_plots import BasePlotter
 from data_generation.utils.io_utils import DiscordNotifier
@@ -16,24 +17,22 @@ logger = logging.getLogger(__name__)
 
 ENGINE_COLORS = {
     "asyncflow": "#2196F3",
-    "parsl": "#FF9800",
+    "parsl":     "#FF9800",
 }
 
 ENGINE_LABELS = {
     "asyncflow": "AsyncFlow",
-    "parsl": "Parsl",
+    "parsl":     "Parsl",
 }
 
-_SET2 = plt.cm.Set2.colors
-COMP_COLORS = {
-    "D_wrap": _SET2[0],
-    "D_overhead": _SET2[1],
-    "D_backend": _SET2[2],
+METRIC_COLORS = {
+    "d_resolve": ENGINE_COLORS["asyncflow"],
+    "d_collect": ENGINE_COLORS["parsl"],
 }
-COMP_LABELS = {
-    "D_wrap": "D_wrap (amortized)",
-    "D_overhead": "D_overhead (D_resolve + D_collect)",
-    "D_backend": "D_backend",
+
+METRIC_LABELS = {
+    "d_resolve": "D_resolve",
+    "d_collect": "D_collect",
 }
 
 
@@ -71,9 +70,6 @@ def _parse_events(events: List[Dict]) -> tuple:
 def _extract_event_durations(events: List[Dict]) -> Dict:
 	"""
 	Compute per-invocation durations from raw events.
-
-	Each tool invocation goes through 4 stages:
-	tool_invoke_start -> tool_resolve_end -> tool_collect_start -> tool_invoke_end
 	
 	Returns:
 	- d_wrap_by_tool: {tool_name: [D_wrap durations]}
@@ -134,7 +130,7 @@ def _compute_invocation_metrics(data: Dict[str, Dict]) -> Dict[str, Dict]:
 	"""
 	Run _extract_event_durations for each engine and compute derived metrics.
 
-	Returns one entry per engine_id with everything the plots need:
+	Returns one entry per engine_id:
 	- All raw durations from _extract_event_durations
 	- makespan: total experiment wall time
 	- n_inv: number of complete invocations
@@ -176,36 +172,80 @@ class BackendComparisonPlotter(BasePlotter):
 		"""Set the plots directory after initialization."""
 		self.plots_dir = plots_dir    
 
-	def plot_results(self, data: Dict[Any, Any]) -> None:
-		"""
-		Generate all plots from experiment data.
+	def _plot_resolve_collect_distributions(self, metrics: Dict, engines: List[str], subdir: str) -> None:
+		"""4 box plots: D_resolve and D_collect per engine side by side."""
+		fig, ax = plt.subplots(figsize=(10, 6))
 
-		Data structure expected:
-		{
-			'asyncflow': BenchmarkedRecord dict,  # AsyncFlow engine results
-			'parsl': BenchmarkedRecord dict,  # Parsl engine results
-		}
-		"""
-		engines = list(data.keys())
-		if not engines:
-			logger.warning("No data to plot.")
-			return
+		box_data = []
+		tick_labels = []
+		colors = []
+		positions = []
+		pos = 1
+		group_centers = []
 
-		sample = data[engines[0]]
-		self._subtitle = (
-			f"({sample['n_of_agents']} agents, "
-			f"{sample['n_of_tool_calls_per_agent']} tool calls/agent, "
-			f"{sample['n_of_backend_slots']} slots)"
+		for e in engines:
+			group_start = pos
+			for key in ("d_resolve", "d_collect"):
+				box_data.append([v * 1000 for v in metrics[e][key]])
+				tick_labels.append(METRIC_LABELS[key])
+				colors.append(METRIC_COLORS[key])
+				positions.append(pos)
+				pos += 1
+			group_centers.append((group_start + pos - 1) / 2.0)
+			pos += 1  
+
+		bp = ax.boxplot(
+			box_data,
+			positions=positions,
+			patch_artist=True,
+			medianprops={"color": "black", "linewidth": 2},
+			widths=0.6,
 		)
+		for patch, color in zip(bp["boxes"], colors):
+			patch.set_facecolor(color)
+			patch.set_alpha(0.7)
 
-		metrics = _compute_invocation_metrics(data)
+		ax.set_xticks(group_centers)
+		ax.set_xticklabels([ENGINE_LABELS.get(e, e) for e in engines], fontsize=12, fontweight="bold")
 
-		self._plot_makespan(metrics, engines, "makespan")
-		self._plot_invocation_breakdown(metrics, engines, "overhead")
-		self._plot_invocation_proportional(metrics, engines, "overhead")
-		self._plot_results_table(metrics, engines)
-		self._plot_overhead_vs_backend(metrics, engines, "overhead")
-		self._plot_overhead_vs_backend_proportional(metrics, engines, "overhead")
+		legend_handles = [Patch(facecolor=METRIC_COLORS[k], alpha=0.7, label=METRIC_LABELS[k])
+						  for k in ("d_resolve", "d_collect")]
+		ax.legend(handles=legend_handles, loc="upper right")
+
+		ax.set_ylabel("Duration (ms)", fontsize=11)
+		ax.set_title(f"D_resolve & D_collect Distributions per Engine\n{self._subtitle}", fontsize=13)
+		ax.grid(True, alpha=0.3, axis="y")
+
+		plt.tight_layout()
+		self._save_plot(fig, "resolve_collect_distributions.png", subdir)
+		plt.close(fig)
+
+	def _plot_overhead_distribution(self, metrics: Dict, engines: List[str], subdir: str) -> None:
+		"""Box plot: D_overhead per engine (2 boxes)."""
+		fig, ax = plt.subplots(figsize=(7, 6))
+
+		box_data = [[v * 1000 for v in metrics[e]["d_overhead"]] for e in engines]
+		labels = [ENGINE_LABELS.get(e, e) for e in engines]
+		colors = [ENGINE_COLORS.get(e, "#999") for e in engines]
+
+		bp = ax.boxplot(
+			box_data,
+			labels=labels,
+			patch_artist=True,
+			medianprops={"color": "black", "linewidth": 2},
+			widths=0.5,
+		)
+		for patch, color in zip(bp["boxes"], colors):
+			patch.set_facecolor(color)
+			patch.set_alpha(0.7)
+
+		ax.set_ylabel("Duration (ms)", fontsize=11)
+		ax.set_title(f"D_overhead Distribution per Engine\n(D_resolve + D_collect)\n{self._subtitle}", fontsize=13)
+		ax.grid(True, alpha=0.3, axis="y")
+
+		plt.tight_layout()
+		self._save_plot(fig, "overhead_distribution.png", subdir)
+		plt.close(fig)
 
 
 	def _plot_makespan(self, metrics: Dict, engines: List[str], subdir: str) -> None:
@@ -234,225 +274,48 @@ class BackendComparisonPlotter(BasePlotter):
 		self._save_plot(fig, "makespan.png", subdir)
 		plt.close(fig)
 
-	def _plot_invocation_breakdown(self, metrics: Dict, engines: List[str], subdir: str) -> None:
-		"""Stacked bar: D_wrap (amortized) + D_overhead + D_backend per engine. Absolute mean time per invocation (ms)"""
-		fig, ax = plt.subplots(figsize=(8, 6))
-
-		labels = [ENGINE_LABELS.get(e, e) for e in engines]
-		x = np.arange(len(engines))
-		width = 0.5
-		components = ["D_wrap", "D_overhead", "D_backend"]
-		values: Dict[str, List[float]] = {c: [] for c in components}
-
-		for e in engines:
-			m = metrics[e]
-			values["D_wrap"].append(m["d_wrap_amortized_ms"])
-			values["D_overhead"].append(np.mean(m["d_overhead"]) * 1000 if m["d_overhead"] else 0.0)
-			values["D_backend"].append(np.mean(m["d_backend"]) * 1000 if m["d_backend"] else 0.0)
-
-		bottom = np.zeros(len(engines))
-		for comp in components:
-			vals = np.array(values[comp])
-			ax.bar(x, vals, width, label=COMP_LABELS[comp], bottom=bottom, color=COMP_COLORS[comp])
-			bottom += vals
-
-		for i, total in enumerate(bottom):
-			ax.text(x[i], total, f"{total:.3f}ms", ha="center", va="bottom", fontsize=10)
-
-		ax.set_xlabel("Backend Engine", fontsize=12)
-		ax.set_ylabel("Mean Time per Invocation (ms)", fontsize=12)
-		ax.set_title(f"Invocation Breakdown (incl. D_wrap amortized)\n{self._subtitle}", fontsize=14)
-		ax.set_xticks(x)
-		ax.set_xticklabels(labels)
-		ax.legend(loc="best")
-		ax.grid(True, alpha=0.3, axis="y")
-		ax.set_ylim(bottom=0)
-
-		plt.tight_layout()
-		self._save_plot(fig, "invocation_breakdown.png", subdir)
-		plt.close(fig)
-
-	def _plot_invocation_proportional(self, metrics: Dict, engines: List[str], subdir: str) -> None:
-		"""Stacked bar: D_wrap (amortized) + D_overhead + D_backend normalized to 100%"""
-		fig, ax = plt.subplots(figsize=(8, 6))
-
-		labels = [ENGINE_LABELS.get(e, e) for e in engines]
-		x = np.arange(len(engines))
-		width = 0.5
-		components = ["D_wrap", "D_overhead", "D_backend"]
-		raw: Dict[str, List[float]] = {c: [] for c in components}
-
-		for e in engines:
-			m = metrics[e]
-			raw["D_wrap"].append(m["d_wrap_amortized_ms"])
-			raw["D_overhead"].append(np.mean(m["d_overhead"]) * 1000 if m["d_overhead"] else 0.0)
-			raw["D_backend"].append(np.mean(m["d_backend"]) * 1000 if m["d_backend"] else 0.0)
-
-		totals = [sum(raw[c][i] for c in components) for i in range(len(engines))]
-		values = {
-			c: [raw[c][i] / totals[i] * 100 if totals[i] > 0 else 0 for i in range(len(engines))]
-			for c in components
-		}
-
-		bottom = np.zeros(len(engines))
-		for comp in components:
-			vals = np.array(values[comp])
-			ax.bar(x, vals, width, label=COMP_LABELS[comp], bottom=bottom, color=COMP_COLORS[comp])
-			for i, (v, b) in enumerate(zip(vals, bottom)):
-				if v > 5:
-					ax.text(x[i], b + v / 2, f"{v:.1f}%", ha="center", va="center", fontsize=9)
-			bottom += vals
-
-		ax.set_xlabel("Backend Engine", fontsize=12)
-		ax.set_ylabel("% of Effective Invocation Cost", fontsize=12)
-		ax.set_title(f"Invocation Breakdown Proportional\n{self._subtitle}", fontsize=14)
-		ax.set_xticks(x)
-		ax.set_xticklabels(labels)
-		ax.legend(loc="best")
-		ax.grid(True, alpha=0.3, axis="y")
-		ax.set_ylim(0, 100)
-
-		plt.tight_layout()
-		self._save_plot(fig, "invocation_proportional.png", subdir)
-		plt.close(fig)
-	
-	
-	def _plot_overhead_vs_backend(self, metrics: Dict, engines: List[str], subdir: str) -> None:
-		"""Stacked bar: D_overhead + D_backend per engine. No D_wrap. Total time (ms)"""
-		fig, ax = plt.subplots(figsize=(8, 6))
-
-		labels = [ENGINE_LABELS.get(e, e) for e in engines]
-		x = np.arange(len(engines))
-		width = 0.5
-		components = ["D_overhead", "D_backend"]
-		values: Dict[str, List[float]] = {c: [] for c in components}
-
-		for e in engines:
-			m = metrics[e]
-			values["D_overhead"].append(sum(m["d_overhead"]) * 1000 if m["d_overhead"] else 0.0)
-			values["D_backend"].append(sum(m["d_backend"]) * 1000 if m["d_backend"] else 0.0)
-
-		bottom = np.zeros(len(engines))
-		for comp in components:
-			vals = np.array(values[comp])
-			ax.bar(x, vals, width, label=COMP_LABELS[comp], bottom=bottom, color=COMP_COLORS[comp])
-			bottom += vals
-
-		for i, total in enumerate(bottom):
-			ax.text(x[i], total, f"{total:.3f}ms", ha="center", va="bottom", fontsize=10)
-
-		ax.set_xlabel("Backend Engine", fontsize=12)
-		ax.set_ylabel("Total Time (ms)", fontsize=12)
-		ax.set_title(f"Overhead vs Backend Total (= D_total)\n{self._subtitle}", fontsize=14)
-		ax.set_xticks(x)
-		ax.set_xticklabels(labels)
-		ax.legend(loc="best")
-		ax.grid(True, alpha=0.3, axis="y")
-		ax.set_ylim(bottom=0)
-
-		plt.tight_layout()
-		self._save_plot(fig, "overhead_vs_backend.png", subdir)
-		plt.close(fig)
-
-	def _plot_overhead_vs_backend_proportional(self, metrics: Dict, engines: List[str], subdir: str) -> None:
-		"""Stacked bar: D_overhead + D_backend normalized to 100%. No D_wrap."""
-		fig, ax = plt.subplots(figsize=(8, 6))
-
-		labels = [ENGINE_LABELS.get(e, e) for e in engines]
-		x = np.arange(len(engines))
-		width = 0.5
-		components = ["D_overhead", "D_backend"]
-		raw: Dict[str, List[float]] = {c: [] for c in components}
-
-		for e in engines:
-			m = metrics[e]
-			raw["D_overhead"].append(sum(m["d_overhead"]) * 1000 if m["d_overhead"] else 0.0)
-			raw["D_backend"].append(sum(m["d_backend"]) * 1000 if m["d_backend"] else 0.0)
-
-		totals = [sum(raw[c][i] for c in components) for i in range(len(engines))]
-		values = {
-			c: [raw[c][i] / totals[i] * 100 if totals[i] > 0 else 0 for i in range(len(engines))]
-			for c in components
-		}
-
-		bottom = np.zeros(len(engines))
-		for comp in components:
-			vals = np.array(values[comp])
-			ax.bar(x, vals, width, label=COMP_LABELS[comp], bottom=bottom, color=COMP_COLORS[comp])
-			for i, (v, b) in enumerate(zip(vals, bottom)):
-				if v > 5:
-					ax.text(x[i], b + v / 2, f"{v:.1f}%", ha="center", va="center", fontsize=9)
-			bottom += vals
-
-		ax.set_xlabel("Backend Engine", fontsize=12)
-		ax.set_ylabel("% of Total D_total", fontsize=12)
-		ax.set_title(f"Overhead vs Backend Proportional\n{self._subtitle}", fontsize=14)
-		ax.set_xticks(x)
-		ax.set_xticklabels(labels)
-		ax.legend(loc="best")
-		ax.grid(True, alpha=0.3, axis="y")
-		ax.set_ylim(0, 100)
-
-		plt.tight_layout()
-		self._save_plot(fig, "overhead_vs_backend_proportional.png", subdir)
-		plt.close(fig)
-
 	def _plot_results_table(self, metrics: Dict, engines: List[str]) -> None:
 		"""Summary table with totals and per-invocation means, grouped by section."""
-		fig, ax = plt.subplots(figsize=(12, 7))
+		fig, ax = plt.subplots(figsize=(12, 9))
 		ax.axis("off")
 
-		stats: Dict[str, Dict] = {}
-		for e in engines:
-			m = metrics[e]
-			overhead_fractions = [
-				(r + c) / t
-				for r, c, t in zip(m["d_resolve"], m["d_collect"], m["d_total"])
-				if t > 0
-			]
-			stats[e] = {
-				"makespan": m["makespan"],
-				"n_inv": m["n_inv"],
-				# totals
-				"d_total_total": sum(m["d_total"]) * 1000,
-				"d_backend_total": sum(m["d_backend"]) * 1000,
-				"d_overhead_total": sum(m["d_overhead"]) * 1000,
-				"d_wrap_total": sum(m["d_wrap"]) * 1000,
-				# per-invocation means
-				"d_total_mean": np.mean(m["d_total"]) * 1000 if m["d_total"] else 0.0,
-				"d_backend_mean": np.mean(m["d_backend"]) * 1000 if m["d_backend"] else 0.0,
-				"d_overhead_mean": np.mean(m["d_overhead"]) * 1000 if m["d_overhead"] else 0.0,
-				"d_wrap_amortized": m["d_wrap_amortized_ms"],
-				"overhead_fraction": np.mean(overhead_fractions) if overhead_fractions else 0.0,
-			}
+		def _mean_ms(values: list) -> float:
+			return float(np.mean(values)) * 1000 if values else 0.0
 
-		def _fmt(v: float) -> str:
-			return f"{v:.3f}"
+		def _overhead_fraction(m: Dict) -> float:
+			d_total = np.asarray(m["d_total"], dtype=float)
+			mask = d_total > 0
+			if not mask.any():
+				return 0.0
+			overhead = np.asarray(m["d_resolve"])[mask] + np.asarray(m["d_collect"])[mask]
+			return float(np.mean(overhead / d_total[mask]))
 
-		SECTION = True
-		DATA = False
 		row_defs = [
-			("Overview", None, SECTION),
-			("Makespan (s)", lambda e: f"{stats[e]['makespan']:.3f}", DATA),
-			("N invocations", lambda e: str(stats[e]["n_inv"]), DATA),
-			("Totals (sum across all invocations)", None, SECTION),
-			("D_total total (ms)", lambda e: _fmt(stats[e]["d_total_total"]), DATA),
-			("D_backend total (ms)", lambda e: _fmt(stats[e]["d_backend_total"]), DATA),
-			("D_overhead total (ms)", lambda e: _fmt(stats[e]["d_overhead_total"]), DATA),
-			("D_wrap total (ms)", lambda e: _fmt(stats[e]["d_wrap_total"]), DATA),
-			("Per Invocation (mean)", None, SECTION),
-			("D_total mean (ms)", lambda e: _fmt(stats[e]["d_total_mean"]), DATA),
-			("D_backend mean (ms)", lambda e: _fmt(stats[e]["d_backend_mean"]), DATA),
-			("D_overhead mean (ms)", lambda e: _fmt(stats[e]["d_overhead_mean"]), DATA),
-			("D_wrap amortized (ms)", lambda e: _fmt(stats[e]["d_wrap_amortized"]), DATA),
-			("Overhead fraction", lambda e: f"{stats[e]['overhead_fraction']:.4f}", DATA),
+			("Overview", None),
+			("Makespan (s)", [f"{metrics[e]['makespan']:.3f}" for e in engines]),
+			("N invocations", [str(metrics[e]["n_inv"]) for e in engines]),
+			("Totals (sum across all invocations)", None),
+			("D_total total (ms)", [f"{sum(metrics[e]['d_total']) * 1000:.3f}" for e in engines]),
+			("D_backend total (ms)", [f"{sum(metrics[e]['d_backend']) * 1000:.3f}" for e in engines]),
+			("D_overhead total (ms)", [f"{sum(metrics[e]['d_overhead']) * 1000:.3f}" for e in engines]),
+			("D_resolve total (ms)", [f"{sum(metrics[e]['d_resolve']) * 1000:.3f}" for e in engines]),
+			("D_collect total (ms)", [f"{sum(metrics[e]['d_collect']) * 1000:.3f}" for e in engines]),
+			("D_wrap total (ms)", [f"{sum(metrics[e]['d_wrap']) * 1000:.3f}" for e in engines]),
+			("Per Invocation (mean)", None),
+			("D_total mean (ms)", [f"{_mean_ms(metrics[e]['d_total']):.3f}" for e in engines]),
+			("D_backend mean (ms)", [f"{_mean_ms(metrics[e]['d_backend']):.3f}" for e in engines]),
+			("D_overhead mean (ms)", [f"{_mean_ms(metrics[e]['d_overhead']):.3f}" for e in engines]),
+			("D_resolve mean (ms)", [f"{_mean_ms(metrics[e]['d_resolve']):.3f}" for e in engines]),
+			("D_collect mean (ms)", [f"{_mean_ms(metrics[e]['d_collect']):.3f}" for e in engines]),
+			("D_wrap amortized (ms)", [f"{metrics[e]['d_wrap_amortized_ms']:.3f}" for e in engines]),
+			("Overhead fraction", [f"{_overhead_fraction(metrics[e]):.4f}" for e in engines]),
 		]
 
 		col_labels = [ENGINE_LABELS.get(e, e) for e in engines]
-		rows = [
-			[label] + ([""] * len(engines) if fn is None else [fn(e) for e in engines])
-			for label, fn, _ in row_defs
-		]
+		rows = []
+		for label, values in row_defs:
+			row = [label] + (values if values is not None else [""] * len(engines))
+			rows.append(row)
 
 		table = ax.table(
 			cellText=rows,
@@ -472,10 +335,9 @@ class BackendComparisonPlotter(BasePlotter):
 
 		# Data rows
 		data_row_idx = 0
-		for i in range(len(row_defs)):
-			is_section = row_defs[i][2]
-			row_i = i + 1  
-			if is_section:
+		for i, (_, values) in enumerate(row_defs):
+			row_i = i + 1
+			if values is None:
 				for j in range(len(engines) + 1):
 					cell = table[row_i, j]
 					cell.set_facecolor("#4A6FA5")
@@ -488,10 +350,41 @@ class BackendComparisonPlotter(BasePlotter):
 					table[row_i, j].set_edgecolor("#CCCCCC")
 				data_row_idx += 1
 
-		ax.set_title(f"Results Summary\n{self._subtitle}", fontsize=14, pad=20)
+		ax.set_title(f"Results Summary\n{self._subtitle}", fontsize=14, pad=40)
 		plt.tight_layout()
 		self._save_plot(fig, "results_table.png", None)
 		plt.close(fig)
+
+
+	def plot_results(self, data: Dict[Any, Any]) -> None:
+		"""
+		Generate all plots from experiment data.
+
+		Data structure expected:
+		{
+			'asyncflow': BenchmarkedRecord dict,  # AsyncFlow engine results
+			'parsl': BenchmarkedRecord dict,  # Parsl engine results
+		}
+		"""
+		engines = list(data.keys())
+		if not engines:
+			logger.warning("No data to plot.")
+			return
+
+		sample = data[engines[0]]
+		self._subtitle = (
+			f"({sample['n_of_agents']} agents, "
+			f"{sample['n_of_tool_calls_per_agent']} tool calls/agent, "
+			f"{sample['n_of_backend_slots']} slots)"
+		)
+
+		metrics = _compute_invocation_metrics(data)
+
+		self._plot_makespan(metrics, engines, "makespan")
+		self._plot_resolve_collect_distributions(metrics, engines, "overhead")
+		self._plot_overhead_distribution(metrics, engines, "overhead")
+		self._plot_results_table(metrics, engines)
+
 
 	def _save_plot(self, fig: plt.Figure, filename: str, subdirectory: Optional[str] = None) -> None:
 		"""Save a plot to the configured directory."""
