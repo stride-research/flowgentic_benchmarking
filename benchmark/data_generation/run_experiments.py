@@ -85,11 +85,15 @@ async def main():
 
 	benchmark = FlowGenticBenchmarkManager()
 
-	# Throughput saturation experiment
+	# Throughput saturation experiment 1a
 	benchmark.register_experiment("throughput_saturation", ThroughputSaturation)
+  
+	# Experiment 1b
 
 	# Experiment 2
 	benchmark.register_experiment("syntethic_adaptive", SynthethicAdaptive)
+
+	# Experiment 3 
 
 	# Execution of experiments
 	await benchmark.run_registerd_experiments()

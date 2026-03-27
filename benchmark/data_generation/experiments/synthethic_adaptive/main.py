@@ -94,49 +94,63 @@ class SynthethicAdaptive(BaseExperiment):
 				n_tool_calls = workload_per_slot
 				n_agents = backend_slots
 
-			workload_config = WorkloadConfig(
-				n_of_agents=n_agents,
-				n_of_tool_calls_per_agent=n_tool_calls,
-				n_of_backend_slots=backend_slots,
-				tool_execution_duration_time=config.tool_execution_duration_time,
-				engine_id=EngineIDs.ASYNCFLOW.value,
-			)
+			for run_index in range(config.number_of_runs):
+				if config.number_of_runs > 1:
+					logger.info(
+						f"  Run {run_index + 1}/{config.number_of_runs} "
+						f"for p={backend_slots}"
+					)
 
-			workload_result: WorkloadResult = await self.run_workload(
-				workload_orchestrator=LangraphWorkload,
-				workload_config=workload_config,
-			)
-			logger.debug(f"Workload result is: {workload_result}")
+				workload_config = WorkloadConfig(
+					n_of_agents=n_agents,
+					n_of_tool_calls_per_agent=n_tool_calls,
+					n_of_backend_slots=backend_slots,
+					tool_execution_duration_time=config.tool_execution_duration_time,
+					engine_id=EngineIDs.ASYNCFLOW.value,
+				)
 
-			benchmark_result = BenchmarkedRecord(
-				# Metadata
-				run_name=config.run_name,
-				run_description=config.run_description,
-				workload_id=config.workload_id,
-				n_of_agents=n_agents,
-				n_of_tool_calls_per_agent=n_tool_calls,
-				n_of_backend_slots=backend_slots,
-				workload_type=config.workload_type,
-				tool_execution_duration_time=config.tool_execution_duration_time,
-				# Results
-				total_makespan=workload_result.total_makespan,
-				events=workload_result.events,
-			).model_dump(mode="json")
-			logger.debug(f"Writing to logs: {benchmark_result}")
+				workload_result: WorkloadResult = await self.run_workload(
+					workload_orchestrator=LangraphWorkload,
+					workload_config=workload_config,
+				)
+				logger.debug(f"Workload result is: {workload_result}")
 
-			workloads_results.append(benchmark_result)
+				benchmark_result = BenchmarkedRecord(
+					# Metadata
+					run_name=config.run_name,
+					run_description=config.run_description,
+					workload_id=config.workload_id,
+					n_of_agents=n_agents,
+					n_of_tool_calls_per_agent=n_tool_calls,
+					n_of_backend_slots=backend_slots,
+					workload_type=config.workload_type,
+					tool_execution_duration_time=config.tool_execution_duration_time,
+					number_of_runs=config.number_of_runs,
+					# Results
+					total_makespan=workload_result.total_makespan,
+					events=workload_result.events,
+					run_index=run_index,
+				).model_dump(mode="json")
+				logger.debug(f"Writing to logs: {benchmark_result}")
 
-			msg = (
-				f"🚀 **Iteration Complete: {config.run_name}**\n"
-				f"**Type:** `{scaling_type.upper()}` | **Slots (p):** `{backend_slots}`\n"
-				f"**Agents:** {n_agents} | **Calls/Agent:** {n_tool_calls}\n"
-				f"⏱️ **Makespan:** `{workload_result.total_makespan:.2f}s`"
-			)
-			send_discord_notifaction(msg)
+				workloads_results.append(benchmark_result)
 
-			# Write to disk after each iteration (incremental save)
-			self.results[experiment_name] = workloads_results
-			self.store_data_to_disk(self.results)
+				run_label = (
+					f" | **Run:** {run_index + 1}/{config.number_of_runs}"
+					if config.number_of_runs > 1
+					else ""
+				)
+				msg = (
+					f"🚀 **Iteration Complete: {config.run_name}**\n"
+					f"**Type:** `{scaling_type.upper()}` | **Slots (p):** `{backend_slots}`{run_label}\n"
+					f"**Agents:** {n_agents} | **Calls/Agent:** {n_tool_calls}\n"
+					f"⏱️ **Makespan:** `{workload_result.total_makespan:.2f}s`"
+				)
+				send_discord_notifaction(msg)
+
+				# Write to disk after each iteration (incremental save)
+				self.results[experiment_name] = workloads_results
+				self.store_data_to_disk(self.results)
 
 	async def run_strong_scaling(self, config: BenchmarkConfig) -> None:
 		"""

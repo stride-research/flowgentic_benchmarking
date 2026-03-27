@@ -1,0 +1,1189 @@
+{
+  "strong_scaling-op-work": [
+    {
+      "run_name": "debug_new_event_model_2",
+      "run_description": "Debugging new event model. Removed plots errors",
+      "workload_id": "langgraph_asyncflow",
+      "n_of_agents": 2,
+      "n_of_tool_calls_per_agent": 2,
+      "n_of_backend_slots": 8,
+      "workload_type": "fixed_agents_vary_tools",
+      "tool_execution_duration_time": 1,
+      "number_of_runs": 1,
+      "total_makespan": 1.8702975000051083,
+      "events": [
+        {
+          "event": "tool_wrap_start",
+          "ts": 39095.445533791,
+          "tool_name": "fetch_temperature",
+          "wrap_id": "63202547-a830-42bf-b897-13b1cca4788b"
+        },
+        {
+          "event": "tool_wrap_end",
+          "ts": 39095.449940291,
+          "tool_name": "fetch_temperature",
+          "wrap_id": "63202547-a830-42bf-b897-13b1cca4788b"
+        },
+        {
+          "event": "tool_wrap_start",
+          "ts": 39095.449968041,
+          "tool_name": "fetch_humidity",
+          "wrap_id": "32678c19-dd7c-44bd-a255-127f6b160755"
+        },
+        {
+          "event": "tool_wrap_end",
+          "ts": 39095.451747875,
+          "tool_name": "fetch_humidity",
+          "wrap_id": "32678c19-dd7c-44bd-a255-127f6b160755"
+        },
+        {
+          "event": "block_wrap_start",
+          "ts": 39095.452240166,
+          "block_name": "chatbot_logic",
+          "wrap_id": "a0d5d72d-9ff2-4f45-abc7-94dfaf9ff887"
+        },
+        {
+          "event": "block_wrap_end",
+          "ts": 39095.452310833,
+          "block_name": "chatbot_logic",
+          "wrap_id": "a0d5d72d-9ff2-4f45-abc7-94dfaf9ff887"
+        },
+        {
+          "event": "tool_invoke_start",
+          "ts": 39095.467943416,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "e66612df-e3ef-4110-ac9d-41610ee0bb75"
+        },
+        {
+          "event": "tool_resolve_end",
+          "ts": 39095.46795325,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "e66612df-e3ef-4110-ac9d-41610ee0bb75",
+          "cache_hit": false
+        },
+        {
+          "event": "tool_invoke_start",
+          "ts": 39095.4682065,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "ce91a16f-30f2-4d78-8253-d441f05e2115"
+        },
+        {
+          "event": "tool_resolve_end",
+          "ts": 39095.4682105,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "ce91a16f-30f2-4d78-8253-d441f05e2115",
+          "cache_hit": true
+        },
+        {
+          "event": "tool_invoke_start",
+          "ts": 39095.46893775,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "4d4440ef-c383-4fbe-b8f3-f2e488333bfa"
+        },
+        {
+          "event": "tool_resolve_end",
+          "ts": 39095.468943166,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "4d4440ef-c383-4fbe-b8f3-f2e488333bfa",
+          "cache_hit": true
+        },
+        {
+          "event": "tool_invoke_start",
+          "ts": 39095.469403416,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "be0d961a-5bf2-40fb-a8d6-1528ee3fc146"
+        },
+        {
+          "event": "tool_resolve_end",
+          "ts": 39095.469407541,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "be0d961a-5bf2-40fb-a8d6-1528ee3fc146",
+          "cache_hit": true
+        },
+        {
+          "event": "tool_collect_start",
+          "ts": 39097.308244166,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "ce91a16f-30f2-4d78-8253-d441f05e2115"
+        },
+        {
+          "event": "tool_invoke_end",
+          "ts": 39097.308293541,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "ce91a16f-30f2-4d78-8253-d441f05e2115"
+        },
+        {
+          "event": "tool_collect_start",
+          "ts": 39097.309477333,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "4d4440ef-c383-4fbe-b8f3-f2e488333bfa"
+        },
+        {
+          "event": "tool_invoke_end",
+          "ts": 39097.309480083,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "4d4440ef-c383-4fbe-b8f3-f2e488333bfa"
+        },
+        {
+          "event": "tool_collect_start",
+          "ts": 39097.309950416,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "e66612df-e3ef-4110-ac9d-41610ee0bb75"
+        },
+        {
+          "event": "tool_invoke_end",
+          "ts": 39097.309952166,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "e66612df-e3ef-4110-ac9d-41610ee0bb75"
+        },
+        {
+          "event": "tool_collect_start",
+          "ts": 39097.310517791,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "be0d961a-5bf2-40fb-a8d6-1528ee3fc146"
+        },
+        {
+          "event": "tool_invoke_end",
+          "ts": 39097.310518958,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "be0d961a-5bf2-40fb-a8d6-1528ee3fc146"
+        }
+      ],
+      "run_index": 0
+    },
+    {
+      "run_name": "debug_new_event_model_2",
+      "run_description": "Debugging new event model. Removed plots errors",
+      "workload_id": "langgraph_asyncflow",
+      "n_of_agents": 2,
+      "n_of_tool_calls_per_agent": 2,
+      "n_of_backend_slots": 4,
+      "workload_type": "fixed_agents_vary_tools",
+      "tool_execution_duration_time": 1,
+      "number_of_runs": 1,
+      "total_makespan": 1.9215240000048652,
+      "events": [
+        {
+          "event": "tool_wrap_start",
+          "ts": 39097.802380083,
+          "tool_name": "fetch_temperature",
+          "wrap_id": "d8ee0b3e-0cf0-47d1-9c0f-a4c19368b784"
+        },
+        {
+          "event": "tool_wrap_end",
+          "ts": 39097.804861416,
+          "tool_name": "fetch_temperature",
+          "wrap_id": "d8ee0b3e-0cf0-47d1-9c0f-a4c19368b784"
+        },
+        {
+          "event": "tool_wrap_start",
+          "ts": 39097.804884958,
+          "tool_name": "fetch_humidity",
+          "wrap_id": "fd2cb280-2f4b-4021-80f9-ce990adc99b3"
+        },
+        {
+          "event": "tool_wrap_end",
+          "ts": 39097.806577916,
+          "tool_name": "fetch_humidity",
+          "wrap_id": "fd2cb280-2f4b-4021-80f9-ce990adc99b3"
+        },
+        {
+          "event": "block_wrap_start",
+          "ts": 39097.806674458,
+          "block_name": "chatbot_logic",
+          "wrap_id": "82a5e132-aa55-4631-9ae5-280c7f4d9ffb"
+        },
+        {
+          "event": "block_wrap_end",
+          "ts": 39097.806703458,
+          "block_name": "chatbot_logic",
+          "wrap_id": "82a5e132-aa55-4631-9ae5-280c7f4d9ffb"
+        },
+        {
+          "event": "tool_invoke_start",
+          "ts": 39097.814526,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "42d8fc5e-05d3-4635-8501-eff903dcd686"
+        },
+        {
+          "event": "tool_resolve_end",
+          "ts": 39097.814531166,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "42d8fc5e-05d3-4635-8501-eff903dcd686",
+          "cache_hit": false
+        },
+        {
+          "event": "tool_invoke_start",
+          "ts": 39097.814786291,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "390eda9e-a47a-46e3-acad-3f3d4eff7248"
+        },
+        {
+          "event": "tool_resolve_end",
+          "ts": 39097.814790041,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "390eda9e-a47a-46e3-acad-3f3d4eff7248",
+          "cache_hit": true
+        },
+        {
+          "event": "tool_invoke_start",
+          "ts": 39097.815003166,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "4b50b62a-8953-41dc-85e6-b48e26ae99d4"
+        },
+        {
+          "event": "tool_resolve_end",
+          "ts": 39097.815006291,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "4b50b62a-8953-41dc-85e6-b48e26ae99d4",
+          "cache_hit": true
+        },
+        {
+          "event": "tool_invoke_start",
+          "ts": 39097.815210375,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "10803f27-0f9b-42c9-9253-40bdf328724c"
+        },
+        {
+          "event": "tool_resolve_end",
+          "ts": 39097.815213333,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "10803f27-0f9b-42c9-9253-40bdf328724c",
+          "cache_hit": true
+        },
+        {
+          "event": "tool_collect_start",
+          "ts": 39099.705101541,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "42d8fc5e-05d3-4635-8501-eff903dcd686"
+        },
+        {
+          "event": "tool_invoke_end",
+          "ts": 39099.705157541,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "42d8fc5e-05d3-4635-8501-eff903dcd686"
+        },
+        {
+          "event": "tool_collect_start",
+          "ts": 39099.706885166,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "390eda9e-a47a-46e3-acad-3f3d4eff7248"
+        },
+        {
+          "event": "tool_invoke_end",
+          "ts": 39099.706891791,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "390eda9e-a47a-46e3-acad-3f3d4eff7248"
+        },
+        {
+          "event": "tool_collect_start",
+          "ts": 39099.71107025,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "4b50b62a-8953-41dc-85e6-b48e26ae99d4"
+        },
+        {
+          "event": "tool_invoke_end",
+          "ts": 39099.711074083,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "4b50b62a-8953-41dc-85e6-b48e26ae99d4"
+        },
+        {
+          "event": "tool_collect_start",
+          "ts": 39099.713698208,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "10803f27-0f9b-42c9-9253-40bdf328724c"
+        },
+        {
+          "event": "tool_invoke_end",
+          "ts": 39099.713714375,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "10803f27-0f9b-42c9-9253-40bdf328724c"
+        }
+      ],
+      "run_index": 0
+    },
+    {
+      "run_name": "debug_new_event_model_2",
+      "run_description": "Debugging new event model. Removed plots errors",
+      "workload_id": "langgraph_asyncflow",
+      "n_of_agents": 2,
+      "n_of_tool_calls_per_agent": 2,
+      "n_of_backend_slots": 2,
+      "workload_type": "fixed_agents_vary_tools",
+      "tool_execution_duration_time": 1,
+      "number_of_runs": 1,
+      "total_makespan": 2.8355678750012885,
+      "events": [
+        {
+          "event": "tool_wrap_start",
+          "ts": 39100.219587375,
+          "tool_name": "fetch_temperature",
+          "wrap_id": "998e75fc-a91e-403a-801e-38e900415de1"
+        },
+        {
+          "event": "tool_wrap_end",
+          "ts": 39100.224937458,
+          "tool_name": "fetch_temperature",
+          "wrap_id": "998e75fc-a91e-403a-801e-38e900415de1"
+        },
+        {
+          "event": "tool_wrap_start",
+          "ts": 39100.2249855,
+          "tool_name": "fetch_humidity",
+          "wrap_id": "eb53c9f6-7b0a-4120-981b-686c7e84c75a"
+        },
+        {
+          "event": "tool_wrap_end",
+          "ts": 39100.227837333,
+          "tool_name": "fetch_humidity",
+          "wrap_id": "eb53c9f6-7b0a-4120-981b-686c7e84c75a"
+        },
+        {
+          "event": "block_wrap_start",
+          "ts": 39100.228041541,
+          "block_name": "chatbot_logic",
+          "wrap_id": "7afc8357-d352-4ac9-8f8f-a1ba1c0fd9b2"
+        },
+        {
+          "event": "block_wrap_end",
+          "ts": 39100.228094208,
+          "block_name": "chatbot_logic",
+          "wrap_id": "7afc8357-d352-4ac9-8f8f-a1ba1c0fd9b2"
+        },
+        {
+          "event": "tool_invoke_start",
+          "ts": 39100.241750625,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "57ae385f-838e-4230-8454-0d43c54c5931"
+        },
+        {
+          "event": "tool_resolve_end",
+          "ts": 39100.241756333,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "57ae385f-838e-4230-8454-0d43c54c5931",
+          "cache_hit": false
+        },
+        {
+          "event": "tool_invoke_start",
+          "ts": 39100.24204225,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "5959f42f-875e-472f-8312-7da7a425303d"
+        },
+        {
+          "event": "tool_resolve_end",
+          "ts": 39100.242046458,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "5959f42f-875e-472f-8312-7da7a425303d",
+          "cache_hit": true
+        },
+        {
+          "event": "tool_invoke_start",
+          "ts": 39100.242853541,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "eb33a928-bd27-43ab-9c99-492858fea056"
+        },
+        {
+          "event": "tool_resolve_end",
+          "ts": 39100.24285775,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "eb33a928-bd27-43ab-9c99-492858fea056",
+          "cache_hit": true
+        },
+        {
+          "event": "tool_invoke_start",
+          "ts": 39100.243118083,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "f001761f-f2c3-425b-8085-bd3ebc84eca8"
+        },
+        {
+          "event": "tool_resolve_end",
+          "ts": 39100.243121708,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "f001761f-f2c3-425b-8085-bd3ebc84eca8",
+          "cache_hit": true
+        },
+        {
+          "event": "tool_collect_start",
+          "ts": 39102.045419916,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "57ae385f-838e-4230-8454-0d43c54c5931"
+        },
+        {
+          "event": "tool_invoke_end",
+          "ts": 39102.045439416,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "57ae385f-838e-4230-8454-0d43c54c5931"
+        },
+        {
+          "event": "tool_collect_start",
+          "ts": 39102.046147541,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "5959f42f-875e-472f-8312-7da7a425303d"
+        },
+        {
+          "event": "tool_invoke_end",
+          "ts": 39102.046154,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "5959f42f-875e-472f-8312-7da7a425303d"
+        },
+        {
+          "event": "tool_collect_start",
+          "ts": 39103.048369416,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "eb33a928-bd27-43ab-9c99-492858fea056"
+        },
+        {
+          "event": "tool_invoke_end",
+          "ts": 39103.048395291,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "eb33a928-bd27-43ab-9c99-492858fea056"
+        },
+        {
+          "event": "tool_collect_start",
+          "ts": 39103.049556125,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "f001761f-f2c3-425b-8085-bd3ebc84eca8"
+        },
+        {
+          "event": "tool_invoke_end",
+          "ts": 39103.04956025,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "f001761f-f2c3-425b-8085-bd3ebc84eca8"
+        }
+      ],
+      "run_index": 0
+    },
+    {
+      "run_name": "debug_new_event_model_2",
+      "run_description": "Debugging new event model. Removed plots errors",
+      "workload_id": "langgraph_asyncflow",
+      "n_of_agents": 2,
+      "n_of_tool_calls_per_agent": 2,
+      "n_of_backend_slots": 1,
+      "workload_type": "fixed_agents_vary_tools",
+      "tool_execution_duration_time": 1,
+      "number_of_runs": 1,
+      "total_makespan": 4.799567832997127,
+      "events": [
+        {
+          "event": "tool_wrap_start",
+          "ts": 39103.554480708,
+          "tool_name": "fetch_temperature",
+          "wrap_id": "f16f90a3-639e-4230-b64b-05e673df7bfa"
+        },
+        {
+          "event": "tool_wrap_end",
+          "ts": 39103.5578695,
+          "tool_name": "fetch_temperature",
+          "wrap_id": "f16f90a3-639e-4230-b64b-05e673df7bfa"
+        },
+        {
+          "event": "tool_wrap_start",
+          "ts": 39103.557905583,
+          "tool_name": "fetch_humidity",
+          "wrap_id": "6ae4e27b-1bfa-4ade-bd49-827c30aeaa10"
+        },
+        {
+          "event": "tool_wrap_end",
+          "ts": 39103.56107,
+          "tool_name": "fetch_humidity",
+          "wrap_id": "6ae4e27b-1bfa-4ade-bd49-827c30aeaa10"
+        },
+        {
+          "event": "block_wrap_start",
+          "ts": 39103.561252125,
+          "block_name": "chatbot_logic",
+          "wrap_id": "004cf5f3-589a-47a5-99d2-a13e7b34dd0d"
+        },
+        {
+          "event": "block_wrap_end",
+          "ts": 39103.561300041,
+          "block_name": "chatbot_logic",
+          "wrap_id": "004cf5f3-589a-47a5-99d2-a13e7b34dd0d"
+        },
+        {
+          "event": "tool_invoke_start",
+          "ts": 39103.5722875,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "138d85a5-d58c-4c73-8c6f-d8b89c8a882d"
+        },
+        {
+          "event": "tool_resolve_end",
+          "ts": 39103.572293458,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "138d85a5-d58c-4c73-8c6f-d8b89c8a882d",
+          "cache_hit": false
+        },
+        {
+          "event": "tool_invoke_start",
+          "ts": 39103.572578625,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "687e857f-1d60-4ee0-853c-fc7cd3742f41"
+        },
+        {
+          "event": "tool_resolve_end",
+          "ts": 39103.572582708,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "687e857f-1d60-4ee0-853c-fc7cd3742f41",
+          "cache_hit": true
+        },
+        {
+          "event": "tool_invoke_start",
+          "ts": 39103.57282775,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "beaec9ab-b9d8-46f5-a844-d7659593c4d3"
+        },
+        {
+          "event": "tool_resolve_end",
+          "ts": 39103.57283125,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "beaec9ab-b9d8-46f5-a844-d7659593c4d3",
+          "cache_hit": true
+        },
+        {
+          "event": "tool_invoke_start",
+          "ts": 39103.573068,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "0adc8b6d-94a7-4f53-b21c-af6bf7009d8f"
+        },
+        {
+          "event": "tool_resolve_end",
+          "ts": 39103.573071833,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "0adc8b6d-94a7-4f53-b21c-af6bf7009d8f",
+          "cache_hit": true
+        },
+        {
+          "event": "tool_collect_start",
+          "ts": 39105.339699833,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "138d85a5-d58c-4c73-8c6f-d8b89c8a882d"
+        },
+        {
+          "event": "tool_invoke_end",
+          "ts": 39105.339739416,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "138d85a5-d58c-4c73-8c6f-d8b89c8a882d"
+        },
+        {
+          "event": "tool_collect_start",
+          "ts": 39106.341888458,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "687e857f-1d60-4ee0-853c-fc7cd3742f41"
+        },
+        {
+          "event": "tool_invoke_end",
+          "ts": 39106.3419,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "687e857f-1d60-4ee0-853c-fc7cd3742f41"
+        },
+        {
+          "event": "tool_collect_start",
+          "ts": 39107.345066708,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "beaec9ab-b9d8-46f5-a844-d7659593c4d3"
+        },
+        {
+          "event": "tool_invoke_end",
+          "ts": 39107.345073,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "beaec9ab-b9d8-46f5-a844-d7659593c4d3"
+        },
+        {
+          "event": "tool_collect_start",
+          "ts": 39108.348289833,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "0adc8b6d-94a7-4f53-b21c-af6bf7009d8f"
+        },
+        {
+          "event": "tool_invoke_end",
+          "ts": 39108.348299166,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "0adc8b6d-94a7-4f53-b21c-af6bf7009d8f"
+        }
+      ],
+      "run_index": 0
+    }
+  ],
+  "weak_scaling-op-work": [
+    {
+      "run_name": "debug_new_event_model_2",
+      "run_description": "Debugging new event model. Removed plots errors",
+      "workload_id": "langgraph_asyncflow",
+      "n_of_agents": 1,
+      "n_of_tool_calls_per_agent": 1,
+      "n_of_backend_slots": 1,
+      "workload_type": "fixed_agents_vary_tools",
+      "tool_execution_duration_time": 1,
+      "number_of_runs": 1,
+      "total_makespan": 1.9463340829970548,
+      "events": [
+        {
+          "event": "tool_wrap_start",
+          "ts": 39108.723766708,
+          "tool_name": "fetch_temperature",
+          "wrap_id": "4b506acb-d0c9-4645-9336-0df9189daaea"
+        },
+        {
+          "event": "tool_wrap_end",
+          "ts": 39108.750999041,
+          "tool_name": "fetch_temperature",
+          "wrap_id": "4b506acb-d0c9-4645-9336-0df9189daaea"
+        },
+        {
+          "event": "tool_wrap_start",
+          "ts": 39108.751298708,
+          "tool_name": "fetch_humidity",
+          "wrap_id": "7efc0c86-a1f4-4a60-9408-ded670e969ec"
+        },
+        {
+          "event": "tool_wrap_end",
+          "ts": 39108.765465625,
+          "tool_name": "fetch_humidity",
+          "wrap_id": "7efc0c86-a1f4-4a60-9408-ded670e969ec"
+        },
+        {
+          "event": "block_wrap_start",
+          "ts": 39108.767057083,
+          "block_name": "chatbot_logic",
+          "wrap_id": "a96003aa-e002-46ce-b39e-1ebc3e7181af"
+        },
+        {
+          "event": "block_wrap_end",
+          "ts": 39108.767490083,
+          "block_name": "chatbot_logic",
+          "wrap_id": "a96003aa-e002-46ce-b39e-1ebc3e7181af"
+        },
+        {
+          "event": "tool_invoke_start",
+          "ts": 39108.821677666,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "4c2d7ef3-7152-422b-a959-01e1d954f2c3"
+        },
+        {
+          "event": "tool_resolve_end",
+          "ts": 39108.821685875,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "4c2d7ef3-7152-422b-a959-01e1d954f2c3",
+          "cache_hit": false
+        },
+        {
+          "event": "tool_collect_start",
+          "ts": 39110.664348458,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "4c2d7ef3-7152-422b-a959-01e1d954f2c3"
+        },
+        {
+          "event": "tool_invoke_end",
+          "ts": 39110.664381583,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "4c2d7ef3-7152-422b-a959-01e1d954f2c3"
+        }
+      ],
+      "run_index": 0
+    },
+    {
+      "run_name": "debug_new_event_model_2",
+      "run_description": "Debugging new event model. Removed plots errors",
+      "workload_id": "langgraph_asyncflow",
+      "n_of_agents": 2,
+      "n_of_tool_calls_per_agent": 1,
+      "n_of_backend_slots": 2,
+      "workload_type": "fixed_agents_vary_tools",
+      "tool_execution_duration_time": 1,
+      "number_of_runs": 1,
+      "total_makespan": 1.804402999994636,
+      "events": [
+        {
+          "event": "tool_wrap_start",
+          "ts": 39110.9835185,
+          "tool_name": "fetch_temperature",
+          "wrap_id": "58d7c844-a23e-45d0-9264-4a9a759014f2"
+        },
+        {
+          "event": "tool_wrap_end",
+          "ts": 39110.98540875,
+          "tool_name": "fetch_temperature",
+          "wrap_id": "58d7c844-a23e-45d0-9264-4a9a759014f2"
+        },
+        {
+          "event": "tool_wrap_start",
+          "ts": 39110.9854255,
+          "tool_name": "fetch_humidity",
+          "wrap_id": "409a2dae-1f7b-4200-ab78-be8a4d43ab83"
+        },
+        {
+          "event": "tool_wrap_end",
+          "ts": 39110.987033375,
+          "tool_name": "fetch_humidity",
+          "wrap_id": "409a2dae-1f7b-4200-ab78-be8a4d43ab83"
+        },
+        {
+          "event": "block_wrap_start",
+          "ts": 39110.987124958,
+          "block_name": "chatbot_logic",
+          "wrap_id": "42dd9341-f846-416b-a3cc-917ce4cf8025"
+        },
+        {
+          "event": "block_wrap_end",
+          "ts": 39110.987151625,
+          "block_name": "chatbot_logic",
+          "wrap_id": "42dd9341-f846-416b-a3cc-917ce4cf8025"
+        },
+        {
+          "event": "tool_invoke_start",
+          "ts": 39110.994989,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "9b0217eb-007c-4ef2-a94a-891df20061c1"
+        },
+        {
+          "event": "tool_resolve_end",
+          "ts": 39110.994993666,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "9b0217eb-007c-4ef2-a94a-891df20061c1",
+          "cache_hit": false
+        },
+        {
+          "event": "tool_invoke_start",
+          "ts": 39110.995265,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "da0c653a-855e-458f-a864-ea62b3d41704"
+        },
+        {
+          "event": "tool_resolve_end",
+          "ts": 39110.99526875,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "da0c653a-855e-458f-a864-ea62b3d41704",
+          "cache_hit": true
+        },
+        {
+          "event": "tool_collect_start",
+          "ts": 39112.778796291,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "da0c653a-855e-458f-a864-ea62b3d41704"
+        },
+        {
+          "event": "tool_invoke_end",
+          "ts": 39112.778858875,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "da0c653a-855e-458f-a864-ea62b3d41704"
+        },
+        {
+          "event": "tool_collect_start",
+          "ts": 39112.780436166,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "9b0217eb-007c-4ef2-a94a-891df20061c1"
+        },
+        {
+          "event": "tool_invoke_end",
+          "ts": 39112.78044025,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "9b0217eb-007c-4ef2-a94a-891df20061c1"
+        }
+      ],
+      "run_index": 0
+    },
+    {
+      "run_name": "debug_new_event_model_2",
+      "run_description": "Debugging new event model. Removed plots errors",
+      "workload_id": "langgraph_asyncflow",
+      "n_of_agents": 4,
+      "n_of_tool_calls_per_agent": 1,
+      "n_of_backend_slots": 4,
+      "workload_type": "fixed_agents_vary_tools",
+      "tool_execution_duration_time": 1,
+      "number_of_runs": 1,
+      "total_makespan": 1.8969220419967314,
+      "events": [
+        {
+          "event": "tool_wrap_start",
+          "ts": 39113.152364916,
+          "tool_name": "fetch_temperature",
+          "wrap_id": "8181e128-2fd3-4bf5-b335-e9af947e503f"
+        },
+        {
+          "event": "tool_wrap_end",
+          "ts": 39113.155678291,
+          "tool_name": "fetch_temperature",
+          "wrap_id": "8181e128-2fd3-4bf5-b335-e9af947e503f"
+        },
+        {
+          "event": "tool_wrap_start",
+          "ts": 39113.155709166,
+          "tool_name": "fetch_humidity",
+          "wrap_id": "b9c704b9-45af-4ef8-bfd6-cf93b31f1a09"
+        },
+        {
+          "event": "tool_wrap_end",
+          "ts": 39113.157484916,
+          "tool_name": "fetch_humidity",
+          "wrap_id": "b9c704b9-45af-4ef8-bfd6-cf93b31f1a09"
+        },
+        {
+          "event": "block_wrap_start",
+          "ts": 39113.157626375,
+          "block_name": "chatbot_logic",
+          "wrap_id": "b2b0c802-65e3-4f3b-935a-9217ec1dd009"
+        },
+        {
+          "event": "block_wrap_end",
+          "ts": 39113.157660958,
+          "block_name": "chatbot_logic",
+          "wrap_id": "b2b0c802-65e3-4f3b-935a-9217ec1dd009"
+        },
+        {
+          "event": "tool_invoke_start",
+          "ts": 39113.172289583,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "2e48c852-e617-4a0c-bd6f-3727d07d55f8"
+        },
+        {
+          "event": "tool_resolve_end",
+          "ts": 39113.172294833,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "2e48c852-e617-4a0c-bd6f-3727d07d55f8",
+          "cache_hit": false
+        },
+        {
+          "event": "tool_invoke_start",
+          "ts": 39113.172542791,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "41340849-db90-4dfb-89ec-1d4a242967f4"
+        },
+        {
+          "event": "tool_resolve_end",
+          "ts": 39113.17254625,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "41340849-db90-4dfb-89ec-1d4a242967f4",
+          "cache_hit": true
+        },
+        {
+          "event": "tool_invoke_start",
+          "ts": 39113.17289675,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "e355445c-cdf4-4a10-96a4-1e0076974d6d"
+        },
+        {
+          "event": "tool_resolve_end",
+          "ts": 39113.172900083,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "e355445c-cdf4-4a10-96a4-1e0076974d6d",
+          "cache_hit": true
+        },
+        {
+          "event": "tool_invoke_start",
+          "ts": 39113.173781,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "a927ff42-a74c-40b2-9524-465c107bea8f"
+        },
+        {
+          "event": "tool_resolve_end",
+          "ts": 39113.173812166,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "a927ff42-a74c-40b2-9524-465c107bea8f",
+          "cache_hit": true
+        },
+        {
+          "event": "tool_collect_start",
+          "ts": 39115.029782583,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "41340849-db90-4dfb-89ec-1d4a242967f4"
+        },
+        {
+          "event": "tool_invoke_end",
+          "ts": 39115.029834541,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "41340849-db90-4dfb-89ec-1d4a242967f4"
+        },
+        {
+          "event": "tool_collect_start",
+          "ts": 39115.031551375,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "2e48c852-e617-4a0c-bd6f-3727d07d55f8"
+        },
+        {
+          "event": "tool_invoke_end",
+          "ts": 39115.031555416,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "2e48c852-e617-4a0c-bd6f-3727d07d55f8"
+        },
+        {
+          "event": "tool_collect_start",
+          "ts": 39115.033605583,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "e355445c-cdf4-4a10-96a4-1e0076974d6d"
+        },
+        {
+          "event": "tool_invoke_end",
+          "ts": 39115.03360775,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "e355445c-cdf4-4a10-96a4-1e0076974d6d"
+        },
+        {
+          "event": "tool_collect_start",
+          "ts": 39115.035738,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "a927ff42-a74c-40b2-9524-465c107bea8f"
+        },
+        {
+          "event": "tool_invoke_end",
+          "ts": 39115.035740083,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "a927ff42-a74c-40b2-9524-465c107bea8f"
+        }
+      ],
+      "run_index": 0
+    },
+    {
+      "run_name": "debug_new_event_model_2",
+      "run_description": "Debugging new event model. Removed plots errors",
+      "workload_id": "langgraph_asyncflow",
+      "n_of_agents": 8,
+      "n_of_tool_calls_per_agent": 1,
+      "n_of_backend_slots": 8,
+      "workload_type": "fixed_agents_vary_tools",
+      "tool_execution_duration_time": 1,
+      "number_of_runs": 1,
+      "total_makespan": 2.3495981250016484,
+      "events": [
+        {
+          "event": "tool_wrap_start",
+          "ts": 39115.45206575,
+          "tool_name": "fetch_temperature",
+          "wrap_id": "c8fce7b5-1ae7-4eae-8137-79df70851eb9"
+        },
+        {
+          "event": "tool_wrap_end",
+          "ts": 39115.458148458,
+          "tool_name": "fetch_temperature",
+          "wrap_id": "c8fce7b5-1ae7-4eae-8137-79df70851eb9"
+        },
+        {
+          "event": "tool_wrap_start",
+          "ts": 39115.458175416,
+          "tool_name": "fetch_humidity",
+          "wrap_id": "7cbe48df-f67c-4a1b-92eb-db05079a3eea"
+        },
+        {
+          "event": "tool_wrap_end",
+          "ts": 39115.470677708,
+          "tool_name": "fetch_humidity",
+          "wrap_id": "7cbe48df-f67c-4a1b-92eb-db05079a3eea"
+        },
+        {
+          "event": "block_wrap_start",
+          "ts": 39115.470801,
+          "block_name": "chatbot_logic",
+          "wrap_id": "a503013a-2835-4ed9-ab8d-c30464f9054d"
+        },
+        {
+          "event": "block_wrap_end",
+          "ts": 39115.470835458,
+          "block_name": "chatbot_logic",
+          "wrap_id": "a503013a-2835-4ed9-ab8d-c30464f9054d"
+        },
+        {
+          "event": "tool_invoke_start",
+          "ts": 39115.533219791,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "f0151d75-6d27-4402-82e4-75d3d8852535"
+        },
+        {
+          "event": "tool_resolve_end",
+          "ts": 39115.533226458,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "f0151d75-6d27-4402-82e4-75d3d8852535",
+          "cache_hit": false
+        },
+        {
+          "event": "tool_invoke_start",
+          "ts": 39115.533499708,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "fb47a730-89ae-4176-a808-f33766a91230"
+        },
+        {
+          "event": "tool_resolve_end",
+          "ts": 39115.533503291,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "fb47a730-89ae-4176-a808-f33766a91230",
+          "cache_hit": true
+        },
+        {
+          "event": "tool_invoke_start",
+          "ts": 39115.533721666,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "a73f6669-fc8a-4ea8-918d-358d63f53e11"
+        },
+        {
+          "event": "tool_resolve_end",
+          "ts": 39115.533725208,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "a73f6669-fc8a-4ea8-918d-358d63f53e11",
+          "cache_hit": true
+        },
+        {
+          "event": "tool_invoke_start",
+          "ts": 39115.533930916,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "b855cb21-472b-4709-87d6-508b60ece26f"
+        },
+        {
+          "event": "tool_resolve_end",
+          "ts": 39115.533934041,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "b855cb21-472b-4709-87d6-508b60ece26f",
+          "cache_hit": true
+        },
+        {
+          "event": "tool_invoke_start",
+          "ts": 39115.534135041,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "83292cb5-1e09-4316-bdc8-c7d278e80e85"
+        },
+        {
+          "event": "tool_resolve_end",
+          "ts": 39115.534138,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "83292cb5-1e09-4316-bdc8-c7d278e80e85",
+          "cache_hit": true
+        },
+        {
+          "event": "tool_invoke_start",
+          "ts": 39115.534523416,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "5cb278f5-ec6f-4226-be14-afd787b49ebb"
+        },
+        {
+          "event": "tool_resolve_end",
+          "ts": 39115.534526458,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "5cb278f5-ec6f-4226-be14-afd787b49ebb",
+          "cache_hit": true
+        },
+        {
+          "event": "tool_invoke_start",
+          "ts": 39115.535280208,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "4addf73e-5ca0-4e75-bece-6165ae812e9a"
+        },
+        {
+          "event": "tool_resolve_end",
+          "ts": 39115.535283666,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "4addf73e-5ca0-4e75-bece-6165ae812e9a",
+          "cache_hit": true
+        },
+        {
+          "event": "tool_invoke_start",
+          "ts": 39115.536443208,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "e1d48df6-bbc0-4382-9d47-95cc444c308c"
+        },
+        {
+          "event": "tool_resolve_end",
+          "ts": 39115.536448291,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "e1d48df6-bbc0-4382-9d47-95cc444c308c",
+          "cache_hit": true
+        },
+        {
+          "event": "tool_collect_start",
+          "ts": 39117.678131,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "f0151d75-6d27-4402-82e4-75d3d8852535"
+        },
+        {
+          "event": "tool_invoke_end",
+          "ts": 39117.678211208,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "f0151d75-6d27-4402-82e4-75d3d8852535"
+        },
+        {
+          "event": "tool_collect_start",
+          "ts": 39117.717057875,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "fb47a730-89ae-4176-a808-f33766a91230"
+        },
+        {
+          "event": "tool_invoke_end",
+          "ts": 39117.717061416,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "fb47a730-89ae-4176-a808-f33766a91230"
+        },
+        {
+          "event": "tool_collect_start",
+          "ts": 39117.723857208,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "a73f6669-fc8a-4ea8-918d-358d63f53e11"
+        },
+        {
+          "event": "tool_invoke_end",
+          "ts": 39117.723871416,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "a73f6669-fc8a-4ea8-918d-358d63f53e11"
+        },
+        {
+          "event": "tool_collect_start",
+          "ts": 39117.724899208,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "b855cb21-472b-4709-87d6-508b60ece26f"
+        },
+        {
+          "event": "tool_invoke_end",
+          "ts": 39117.724901125,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "b855cb21-472b-4709-87d6-508b60ece26f"
+        },
+        {
+          "event": "tool_collect_start",
+          "ts": 39117.731536791,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "83292cb5-1e09-4316-bdc8-c7d278e80e85"
+        },
+        {
+          "event": "tool_invoke_end",
+          "ts": 39117.731538625,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "83292cb5-1e09-4316-bdc8-c7d278e80e85"
+        },
+        {
+          "event": "tool_collect_start",
+          "ts": 39117.791666916,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "5cb278f5-ec6f-4226-be14-afd787b49ebb"
+        },
+        {
+          "event": "tool_invoke_end",
+          "ts": 39117.791674791,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "5cb278f5-ec6f-4226-be14-afd787b49ebb"
+        },
+        {
+          "event": "tool_collect_start",
+          "ts": 39117.792371458,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "4addf73e-5ca0-4e75-bece-6165ae812e9a"
+        },
+        {
+          "event": "tool_invoke_end",
+          "ts": 39117.792373541,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "4addf73e-5ca0-4e75-bece-6165ae812e9a"
+        },
+        {
+          "event": "tool_collect_start",
+          "ts": 39117.797849916,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "e1d48df6-bbc0-4382-9d47-95cc444c308c"
+        },
+        {
+          "event": "tool_invoke_end",
+          "ts": 39117.797852,
+          "tool_name": "fetch_temperature",
+          "invocation_id": "e1d48df6-bbc0-4382-9d47-95cc444c308c"
+        }
+      ],
+      "run_index": 0
+    }
+  ]
+}
