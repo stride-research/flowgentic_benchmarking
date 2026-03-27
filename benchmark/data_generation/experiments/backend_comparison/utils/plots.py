@@ -18,11 +18,17 @@ logger = logging.getLogger(__name__)
 ENGINE_COLORS = {
     "asyncflow": "#2196F3",
     "parsl":     "#FF9800",
+    "langraph":  "#2196F3",
+    "autogen":   "#4CAF50",
+    "academy":   "#9C27B0",
 }
 
 ENGINE_LABELS = {
     "asyncflow": "AsyncFlow",
     "parsl":     "Parsl",
+    "langraph":  "LangGraph and AsyncFlow",
+    "autogen":   "AutoGen and AsyncFlow",
+    "academy":   "Academy and AsyncFlow",
 }
 
 METRIC_COLORS = {
@@ -93,35 +99,55 @@ def _extract_event_durations(events: List[Dict]) -> Dict:
 			
 	# Per-invocation stage durations
 	d_resolve, d_backend, d_collect, d_total = [], [], [], []
+	d_resolve_ss, d_overhead_ss = [], []  # steady-state: first invocation per tool dropped
 	inv_by_tool: Dict[str, int] = {}
 	required_keys = ("tool_invoke_start", "tool_resolve_end",
 					  "tool_collect_start", "tool_invoke_end")
 
-	for invocation in invocations.values():
-		if not all(k in invocation for k in required_keys):
-			continue
+	# Sort by invoke start time to correctly identify first invocation per tool
+	sorted_invocations = sorted(
+		(inv for inv in invocations.values() if all(k in inv for k in required_keys)),
+		key=lambda inv: inv["tool_invoke_start"],
+	)
 
+	seen_tools: set = set()
+	for invocation in sorted_invocations:
 		t_invoke_start = invocation["tool_invoke_start"]
 		t_resolve_end = invocation["tool_resolve_end"]
 		t_collect_start = invocation["tool_collect_start"]
 		t_invoke_end = invocation["tool_invoke_end"]
 
-		d_resolve.append(t_resolve_end - t_invoke_start)
-		d_backend.append(t_collect_start - t_resolve_end)
-		d_collect.append(t_invoke_end - t_collect_start)
-		d_total.append(t_invoke_end - t_invoke_start)
+		dr = t_resolve_end - t_invoke_start
+		db = t_collect_start - t_resolve_end
+		dc = t_invoke_end - t_collect_start
+		dt = t_invoke_end - t_invoke_start
 
-		if "tool_name" in invocation:
-			tool_name = invocation["tool_name"]
+		d_resolve.append(dr)
+		d_backend.append(db)
+		d_collect.append(dc)
+		d_total.append(dt)
+
+		tool_name = invocation.get("tool_name")
+		if tool_name is not None:
 			inv_by_tool[tool_name] = inv_by_tool.get(tool_name, 0) + 1
+			if tool_name not in seen_tools:
+				seen_tools.add(tool_name)
+			else:
+				d_resolve_ss.append(dr)
+				d_overhead_ss.append(dr + dc)
+		else:
+			d_resolve_ss.append(dr)
+			d_overhead_ss.append(dr + dc)
 
 	return {
 		"d_wrap_by_tool": d_wrap_by_tool,
 		"d_wrap": [v for vals in d_wrap_by_tool.values() for v in vals],
 		"d_resolve": d_resolve,
+		"d_resolve_ss": d_resolve_ss,
 		"d_backend": d_backend,
 		"d_collect": d_collect,
 		"d_total": d_total,
+		"d_overhead_ss": d_overhead_ss,
 		"inv_by_tool": inv_by_tool,
 	}
 
@@ -172,7 +198,7 @@ class BackendComparisonPlotter(BasePlotter):
 		"""Set the plots directory after initialization."""
 		self.plots_dir = plots_dir    
 
-	def _plot_resolve_collect_distributions(self, metrics: Dict, engines: List[str], subdir: str) -> None:
+	def _plot_resolve_collect_distributions(self, metrics: Dict, engines: List[str], subdir: str, labels: Dict[str, str] = ENGINE_LABELS) -> None:
 		"""4 box plots: D_resolve and D_collect per engine side by side."""
 		fig, ax = plt.subplots(figsize=(10, 6))
 
@@ -185,10 +211,10 @@ class BackendComparisonPlotter(BasePlotter):
 
 		for e in engines:
 			group_start = pos
-			for key in ("d_resolve", "d_collect"):
-				box_data.append([v * 1000 for v in metrics[e][key]])
-				tick_labels.append(METRIC_LABELS[key])
-				colors.append(METRIC_COLORS[key])
+			for data_key, label_key in (("d_resolve_ss", "d_resolve"), ("d_collect", "d_collect")):
+				box_data.append([v * 1000 for v in metrics[e][data_key]])
+				tick_labels.append(METRIC_LABELS[label_key])
+				colors.append(METRIC_COLORS[label_key])
 				positions.append(pos)
 				pos += 1
 			group_centers.append((group_start + pos - 1) / 2.0)
@@ -206,7 +232,7 @@ class BackendComparisonPlotter(BasePlotter):
 			patch.set_alpha(0.7)
 
 		ax.set_xticks(group_centers)
-		ax.set_xticklabels([ENGINE_LABELS.get(e, e) for e in engines], fontsize=12, fontweight="bold")
+		ax.set_xticklabels([labels.get(e, e) for e in engines], fontsize=12, fontweight="bold")
 
 		legend_handles = [Patch(facecolor=METRIC_COLORS[k], alpha=0.7, label=METRIC_LABELS[k])
 						  for k in ("d_resolve", "d_collect")]
@@ -220,12 +246,39 @@ class BackendComparisonPlotter(BasePlotter):
 		self._save_plot(fig, "resolve_collect_distributions.png", subdir)
 		plt.close(fig)
 
-	def _plot_overhead_distribution(self, metrics: Dict, engines: List[str], subdir: str) -> None:
+	def _plot_wrap_distribution(self, metrics: Dict, engines: List[str], subdir: str, labels: Dict[str, str] = ENGINE_LABELS) -> None:
+		"""Box plot: D_wrap per engine (one box per engine, all tools combined)."""
+		fig, ax = plt.subplots(figsize=(7, 6))
+
+		box_data = [[v * 1000 for v in metrics[e]["d_wrap"]] for e in engines]
+		tick_labels = [labels.get(e, e) for e in engines]
+		colors = [ENGINE_COLORS.get(e, "#999") for e in engines]
+
+		bp = ax.boxplot(
+			box_data,
+			labels=tick_labels,
+			patch_artist=True,
+			medianprops={"color": "black", "linewidth": 2},
+			widths=0.5,
+		)
+		for patch, color in zip(bp["boxes"], colors):
+			patch.set_facecolor(color)
+			patch.set_alpha(0.7)
+
+		ax.set_ylabel("Duration (ms)", fontsize=11)
+		ax.set_title(f"D_wrap Distribution per Engine\n{self._subtitle}", fontsize=13)
+		ax.grid(True, alpha=0.3, axis="y")
+
+		plt.tight_layout()
+		self._save_plot(fig, "wrap_distribution.png", subdir)
+		plt.close(fig)
+
+	def _plot_overhead_distribution(self, metrics: Dict, engines: List[str], subdir: str, labels: Dict[str, str] = ENGINE_LABELS) -> None:
 		"""Box plot: D_overhead per engine (2 boxes)."""
 		fig, ax = plt.subplots(figsize=(7, 6))
 
-		box_data = [[v * 1000 for v in metrics[e]["d_overhead"]] for e in engines]
-		labels = [ENGINE_LABELS.get(e, e) for e in engines]
+		box_data = [[v * 1000 for v in metrics[e]["d_overhead_ss"]] for e in engines]
+		labels = [labels.get(e, e) for e in engines]
 		colors = [ENGINE_COLORS.get(e, "#999") for e in engines]
 
 		bp = ax.boxplot(
@@ -248,13 +301,13 @@ class BackendComparisonPlotter(BasePlotter):
 		plt.close(fig)
 
 
-	def _plot_makespan(self, metrics: Dict, engines: List[str], subdir: str) -> None:
+	def _plot_makespan(self, metrics: Dict, engines: List[str], subdir: str, labels: Dict[str, str] = ENGINE_LABELS) -> None:
 		"""Total execution time (makespan) per engine."""
 		fig, ax = plt.subplots(figsize=(8, 6))
 
 		makespans = [metrics[e]["makespan"] for e in engines]
 		colors = [ENGINE_COLORS.get(e, "#999") for e in engines]
-		labels = [ENGINE_LABELS.get(e, e) for e in engines]
+		labels = [labels.get(e, e) for e in engines]
 
 		bars = ax.bar(labels, makespans, color=colors, width=0.5)
 		for bar in bars:
@@ -274,7 +327,7 @@ class BackendComparisonPlotter(BasePlotter):
 		self._save_plot(fig, "makespan.png", subdir)
 		plt.close(fig)
 
-	def _plot_results_table(self, metrics: Dict, engines: List[str]) -> None:
+	def _plot_results_table(self, metrics: Dict, engines: List[str], labels: Dict[str, str] = ENGINE_LABELS) -> None:
 		"""Summary table with totals and per-invocation means, grouped by section."""
 		fig, ax = plt.subplots(figsize=(12, 9))
 		ax.axis("off")
@@ -297,21 +350,21 @@ class BackendComparisonPlotter(BasePlotter):
 			("Totals (sum across all invocations)", None),
 			("D_total total (ms)", [f"{sum(metrics[e]['d_total']) * 1000:.3f}" for e in engines]),
 			("D_backend total (ms)", [f"{sum(metrics[e]['d_backend']) * 1000:.3f}" for e in engines]),
-			("D_overhead total (ms)", [f"{sum(metrics[e]['d_overhead']) * 1000:.3f}" for e in engines]),
-			("D_resolve total (ms)", [f"{sum(metrics[e]['d_resolve']) * 1000:.3f}" for e in engines]),
+			("D_overhead total (ms)", [f"{sum(metrics[e]['d_overhead_ss']) * 1000:.3f}" for e in engines]),
+			("D_resolve total (ms)", [f"{sum(metrics[e]['d_resolve_ss']) * 1000:.3f}" for e in engines]),
 			("D_collect total (ms)", [f"{sum(metrics[e]['d_collect']) * 1000:.3f}" for e in engines]),
 			("D_wrap total (ms)", [f"{sum(metrics[e]['d_wrap']) * 1000:.3f}" for e in engines]),
 			("Per Invocation (mean)", None),
 			("D_total mean (ms)", [f"{_mean_ms(metrics[e]['d_total']):.3f}" for e in engines]),
 			("D_backend mean (ms)", [f"{_mean_ms(metrics[e]['d_backend']):.3f}" for e in engines]),
-			("D_overhead mean (ms)", [f"{_mean_ms(metrics[e]['d_overhead']):.3f}" for e in engines]),
-			("D_resolve mean (ms)", [f"{_mean_ms(metrics[e]['d_resolve']):.3f}" for e in engines]),
+			("D_overhead mean (ms)", [f"{_mean_ms(metrics[e]['d_overhead_ss']):.3f}" for e in engines]),
+			("D_resolve mean (ms)", [f"{_mean_ms(metrics[e]['d_resolve_ss']):.3f}" for e in engines]),
 			("D_collect mean (ms)", [f"{_mean_ms(metrics[e]['d_collect']):.3f}" for e in engines]),
 			("D_wrap amortized (ms)", [f"{metrics[e]['d_wrap_amortized_ms']:.3f}" for e in engines]),
 			("Overhead fraction", [f"{_overhead_fraction(metrics[e]):.4f}" for e in engines]),
 		]
 
-		col_labels = [ENGINE_LABELS.get(e, e) for e in engines]
+		col_labels = [labels.get(e, e) for e in engines]
 		rows = []
 		for label, values in row_defs:
 			row = [label] + (values if values is not None else [""] * len(engines))
@@ -356,7 +409,7 @@ class BackendComparisonPlotter(BasePlotter):
 		plt.close(fig)
 
 
-	def plot_results(self, data: Dict[Any, Any]) -> None:
+	def plot_results(self, data: Dict[Any, Any], engine_labels: Optional[Dict[str, str]] = None) -> None:
 		"""
 		Generate all plots from experiment data.
 
@@ -371,6 +424,8 @@ class BackendComparisonPlotter(BasePlotter):
 			logger.warning("No data to plot.")
 			return
 
+		labels = {**ENGINE_LABELS, **(engine_labels or {})}
+
 		sample = data[engines[0]]
 		self._subtitle = (
 			f"({sample['n_of_agents']} agents, "
@@ -380,10 +435,11 @@ class BackendComparisonPlotter(BasePlotter):
 
 		metrics = _compute_invocation_metrics(data)
 
-		self._plot_makespan(metrics, engines, "makespan")
-		self._plot_resolve_collect_distributions(metrics, engines, "overhead")
-		self._plot_overhead_distribution(metrics, engines, "overhead")
-		self._plot_results_table(metrics, engines)
+		self._plot_makespan(metrics, engines, "makespan", labels)
+		self._plot_resolve_collect_distributions(metrics, engines, "overhead", labels)
+		self._plot_overhead_distribution(metrics, engines, "overhead", labels)
+		self._plot_wrap_distribution(metrics, engines, "overhead", labels)
+		self._plot_results_table(metrics, engines, labels)
 
 
 	def _save_plot(self, fig: plt.Figure, filename: str, subdirectory: Optional[str] = None) -> None:

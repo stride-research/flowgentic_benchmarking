@@ -90,6 +90,7 @@ class DiscordNotifier:
 		self.webhook_url = os.getenv("DISCORD_WEBHOOK")
 	
 	def send_discord_notification(self, msg: str, image_path: str = None):
+		return None
 		if not self.webhook_url:
 			return None
 		

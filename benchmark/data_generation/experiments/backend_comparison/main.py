@@ -1,7 +1,5 @@
 from enum import Enum
-from pathlib import Path
 from typing import Any, Callable, Dict, Literal
-
 
 from data_generation.experiments.base.base_experiment import (
 	BaseExperiment,
@@ -11,27 +9,34 @@ from data_generation.experiments.backend_comparison.utils.plots import (
     BackendComparisonPlotter,
 )
 from data_generation.utils.schemas import (
-	BenchmarkConfig,
-	BenchmarkedRecord,
-	EngineIDs,
-	WorkloadConfig,
-	WorkloadResult,
+    BenchmarkConfig,
+    BenchmarkedRecord,
+    EngineIDs,
+    WorkloadConfig,
+    WorkloadResult,
 )
 from data_generation.workload.langgraph import LangraphWorkload
+from data_generation.workload.autogen import AutogenWorkload
+from data_generation.workload.academy import AcademyWorkload
 
 import logging
 import os
 import requests
+from pathlib import Path
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
-
 logger = logging.getLogger(__name__)
 
 
-ENGINES = [EngineIDs.ASYNCFLOW.value, EngineIDs.PARSL.value]
+WORKLOADS = {
+    "langraph": (LangraphWorkload, EngineIDs.ASYNCFLOW.value),
+    "parsl":    (LangraphWorkload, EngineIDs.PARSL.value),
+    "autogen":  (AutogenWorkload,  EngineIDs.ASYNCFLOW.value),
+    "academy":  (AcademyWorkload,  EngineIDs.ASYNCFLOW.value),
+}
 
 
 def send_discord_notifaction(msg: str):
@@ -53,14 +58,9 @@ class BackendComparison(BaseExperiment):
 		self,
 		config: BenchmarkConfig,
 		engine_id: str,
-	) -> None:
-		"""
-		Run the identical workload on a specific engine (Parsl or AsyncFlow).
+	) -> Dict:
+		workload_cls, hpc_backend_id = WORKLOADS[engine_id]
 
-		Args:
-			config: Benchmark configuration
-			engine_id: Identifier of the engine to run on ("asyncflow" or "parsl")
-		"""
 		logger.info(f"=== BACKEND COMPARISON: {engine_id} ===")
 		logger.info(f"Config is: {config.model_dump_json(indent=4)}")
 
@@ -69,17 +69,16 @@ class BackendComparison(BaseExperiment):
 			n_of_tool_calls_per_agent=config.n_of_tool_calls_per_agent,
 			n_of_backend_slots=config.n_of_backend_slots,
 			tool_execution_duration_time=config.tool_execution_duration_time,
-			engine_id=engine_id,
+			engine_id=hpc_backend_id,
 		)
 
 		workload_result: WorkloadResult = await self.run_workload(
-			workload_orchestrator=LangraphWorkload,
+			workload_orchestrator=workload_cls,
 			workload_config=workload_config,
 		)
 		logger.debug(f"Workload result is: {workload_result}")
 
-		benchmark_result = BenchmarkedRecord(
-			# Metadata
+		record = BenchmarkedRecord(
 			run_name=config.run_name,
 			run_description=config.run_description,
 			workload_id=config.workload_id,
@@ -88,11 +87,9 @@ class BackendComparison(BaseExperiment):
 			n_of_backend_slots=config.n_of_backend_slots,
 			workload_type=config.workload_type,
 			tool_execution_duration_time=config.tool_execution_duration_time,
-			# Results
 			total_makespan=workload_result.total_makespan,
 			events=workload_result.events,
 		).model_dump(mode="json")
-		logger.debug(f"Writing to logs: {benchmark_result}")
 
 		msg = (
 			f"🚀 **Iteration Complete: {config.run_name}**\n"
@@ -102,14 +99,30 @@ class BackendComparison(BaseExperiment):
 		)
 		send_discord_notifaction(msg)
 
-        # Write to disk
-		self.results[engine_id] = benchmark_result
+		self.results[engine_id] = record
 		self.store_data_to_disk(self.results)
+		return record
 
 	async def run_experiment(self) -> None:
-		"""Run the same workload on both AsyncFlow and Parsl backends"""
-		for engine_id in ENGINES:
-			await self._run_for_engine(self.benchmark_config, engine_id)
+		"""Run the workload for each engine sequentially."""
+		for engine_id in WORKLOADS:
+			self.results[engine_id] = await self._run_for_engine(
+				self.benchmark_config, engine_id
+			)
 
 	def generate_plots(self, data: Dict[Any, Any]):
-		self.plotter.plot_results(data=data)
+		plots_dir = self.plotter.plots_dir
+
+		# Backend comparison: LangGraph on AsyncFlow vs Parsl
+		self.plotter.set_plots_dir(plots_dir / "backend_comparison")
+		self.plotter.plot_results(
+			data={k: data[k] for k in ("langraph", "parsl") if k in data},
+			engine_labels={"langraph": "AsyncFlow", "parsl": "Parsl"},
+		)
+
+		# Orchestrator comparison: LangGraph vs AutoGen vs Academy, all on AsyncFlow
+		self.plotter.set_plots_dir(plots_dir / "orchestrator_comparison")
+		self.plotter.plot_results(
+			data={k: data[k] for k in ("langraph", "autogen", "academy") if k in data},
+			engine_labels={"langraph": "LangGraph", "autogen": "AutoGen", "academy": "Academy"},
+		)

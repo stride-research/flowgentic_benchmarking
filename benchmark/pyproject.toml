@@ -5,7 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "flowgentic[langgraph,asyncflow,academy] @ git+https://github.com/stride-research/flowgentic.git@hotfix/benchmarking_redesign",
+    "flowgentic[langgraph,asyncflow,autogen,parsl,academy] @ git+https://github.com/stride-research/flowgentic.git@experiment/exp3-benchmarking-hotfix",
     "radical-asyncflow",
     "academy-py",
     "pyyaml",
@@ -23,6 +23,9 @@ dev = [
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["data_generation*"]
 
 [tool.uv.sources]
 academy-py = { git = "https://github.com/proxystore/academy" }

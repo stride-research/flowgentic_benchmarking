@@ -1,3 +1,4 @@
+import tempfile
 from concurrent.futures import ProcessPoolExecutor
 from contextlib import asynccontextmanager
 from typing import Any, Callable, Dict, Optional
@@ -35,7 +36,6 @@ async def resolve_engine(
 			executor.shutdown(wait=True)
 	elif engine_id == "parsl":
 		parsl_config = Config(
-    		run_dir="/tmp/parsl_runinfo",
     		executors=[HighThroughputExecutor(max_workers_per_node=n_of_backend_slots, label="local", encrypted=False)]
 		)
 		try:
