@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import json
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 import logging
 
@@ -19,10 +20,11 @@ class BaseExperiment(ABC):
 
 	"""
 
-	def __init__(self, data_dir, plots_dir) -> None:
+	def __init__(self, data_dir, plots_dir, config_path: Path = Path("config.yml")) -> None:
 		super().__init__()
 		self.data_dir = data_dir
 		self.plots_dir = plots_dir
+		self.config_path = config_path
 
 	async def run_workload(
 		self, workload_orchestrator: BaseWorkload, workload_config: WorkloadConfig
@@ -42,8 +44,16 @@ class BaseExperiment(ABC):
 		return WorkloadResult(total_makespan=makespan, events=events)
 
 	@abstractmethod
-	async def run_experiment(self, index: Optional[int] = None) -> None:
-		"""Run experiment. Pass index to run a single sweep point (dragon mode)."""
+	async def run_experiment(
+		self,
+		sweep_index: Optional[int] = None,
+		iter_index: Optional[int] = None,
+	) -> None:
+		"""Run the experiment.
+
+		sweep_index: run only this position in the sweep list. None = run all.
+		iter_index:  run only this repetition. None = run once (iter 0).
+		"""
 		pass
 
 	@abstractmethod

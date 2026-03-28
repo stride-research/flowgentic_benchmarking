@@ -19,8 +19,6 @@ from data_generation.workload.langgraph import LangraphWorkload
 
 logger = logging.getLogger(__name__)
 
-CONFIG_PATH = Path("config.yml")
-
 
 def extract_invocation_metrics(events: List[Dict[str, Any]]) -> Dict[str, Any]:
 	"""
@@ -146,16 +144,20 @@ class ThroughputSaturation(BaseExperiment):
 	"""
 
 	def __init__(
-		self, benchmark_config: BenchmarkConfig, data_dir: str, plots_dir: str
+		self,
+		benchmark_config: BenchmarkConfig,
+		data_dir: str,
+		plots_dir: str,
+		config_path: Path = Path("config.yml"),
 	) -> None:
-		super().__init__(data_dir, plots_dir)
+		super().__init__(data_dir, plots_dir, config_path)
 		self.benchmark_config = benchmark_config
 		self.plotter = ThroughputSaturationPlotter(plots_dir=plots_dir)
 		self._load_experiment_config()
 
 	def _load_experiment_config(self):
 		"""Read experiment-specific sweep parameters from config.yml."""
-		with open(CONFIG_PATH) as f:
+		with open(self.config_path) as f:
 			raw = yaml.safe_load(f)
 		exp_cfg = raw.get("throughput_saturation", {})
 
@@ -163,18 +165,13 @@ class ThroughputSaturation(BaseExperiment):
 		self.n_of_tool_calls_per_agent: int = exp_cfg.get("n_of_tool_calls_per_agent", 64)
 		self.n_of_backend_slots: int = exp_cfg.get("n_of_backend_slots", 512)
 		self.tool_execution_duration_time: int = exp_cfg.get("tool_execution_duration_time", 0)
-		self.n_runs: int = exp_cfg.get("n_runs", 1)
 
-	async def run_experiment(self, index: Optional[int] = None) -> None:
-		"""
-		Run the throughput saturation sweep.
-
-		Args:
-			index: If provided, run only n_of_agents_sweep[index] (dragon mode — one
-			       dragon invocation per sweep point). If None, run all points
-			       sequentially (local mode).
-		"""
-		sweep = [self.n_of_agents_sweep[index]] if index is not None else self.n_of_agents_sweep
+	async def run_experiment(
+		self,
+		sweep_index: Optional[int] = None,
+		iter_index: Optional[int] = None,
+	) -> None:
+		sweep = [self.n_of_agents_sweep[sweep_index]] if sweep_index is not None else self.n_of_agents_sweep
 
 		logger.info("=== FLOWGENTIC THROUGHPUT SATURATION (noop tools) ===")
 		logger.info(
@@ -194,35 +191,35 @@ class ThroughputSaturation(BaseExperiment):
 				engine_id=self.benchmark_config.engine_id,
 			)
 
-			for run_index in range(self.n_runs):
-				if self.n_runs > 1:
-					logger.info(f"  Run {run_index + 1}/{self.n_runs} for n_agents={n_agents}")
+			run_index = iter_index if iter_index is not None else 0
+			if iter_index is not None:
+				logger.info(f"  Run iter={run_index} for n_agents={n_agents}")
 
-				workload_result: WorkloadResult = await self.run_workload(
-					workload_orchestrator=LangraphWorkload,
-					workload_config=workload_config,
-				)
+			workload_result: WorkloadResult = await self.run_workload(
+				workload_orchestrator=LangraphWorkload,
+				workload_config=workload_config,
+			)
 
-				metrics = extract_invocation_metrics(workload_result.events)
+			metrics = extract_invocation_metrics(workload_result.events)
 
-				logger.info(
-					f"    throughput={metrics.get('throughput', 0):.2f} inv/s  "
-					f"t_run={metrics.get('t_run', 0):.3f}s  "
-					f"d_overhead_mean={metrics.get('d_overhead_mean', 0)*1000:.2f}ms  "
-					f"d_total_p95={metrics.get('d_total_p95', 0)*1000:.2f}ms"
-				)
+			logger.info(
+				f"    throughput={metrics.get('throughput', 0):.2f} inv/s  "
+				f"t_run={metrics.get('t_run', 0):.3f}s  "
+				f"d_overhead_mean={metrics.get('d_overhead_mean', 0)*1000:.2f}ms  "
+				f"d_total_p95={metrics.get('d_total_p95', 0)*1000:.2f}ms"
+			)
 
-				record = {
-					"n_agents": n_agents,
-					"n_of_tool_calls_per_agent": self.n_of_tool_calls_per_agent,
-					"n_of_backend_slots": self.n_of_backend_slots,
-					"tool_execution_duration_time": self.tool_execution_duration_time,
-					"total_invocations": total_invocations,
-					"run_index": run_index,
-					"total_makespan": workload_result.total_makespan,
-					**metrics,
-				}
-				self.store_data_to_disk(record)
+			record = {
+				"n_agents": n_agents,
+				"n_of_tool_calls_per_agent": self.n_of_tool_calls_per_agent,
+				"n_of_backend_slots": self.n_of_backend_slots,
+				"tool_execution_duration_time": self.tool_execution_duration_time,
+				"total_invocations": total_invocations,
+				"run_index": run_index,
+				"total_makespan": workload_result.total_makespan,
+				**metrics,
+			}
+			self.store_data_to_disk(record)
 
 	def generate_plots(self, data: List[Dict[Any, Any]]):
 		self.plotter.plot_results(data)

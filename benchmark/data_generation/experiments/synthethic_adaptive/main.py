@@ -25,14 +25,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-CONFIG_PATH = Path("config.yml")
-
-
 logger = logging.getLogger(__name__)
 
-
 ScalingType = Literal["strong", "weak"]
-
 
 def send_discord_notifaction(msg: str):
 	webhook_url = os.getenv("DISCORD_WEBHOOK")
@@ -42,46 +37,35 @@ def send_discord_notifaction(msg: str):
 
 class SynthethicAdaptive(BaseExperiment):
 	def __init__(
-		self, benchmark_config: BenchmarkConfig, data_dir: str, plots_dir: str
+		self,
+		benchmark_config: BenchmarkConfig,
+		data_dir: str,
+		plots_dir: str,
+		config_path: Path = Path("config.yml"),
 	) -> None:
-		super().__init__(data_dir, plots_dir)
+		super().__init__(data_dir, plots_dir, config_path)
 		self.benchmark_config = benchmark_config
 		self.plotter = SyntheticAdaptivePlotter(plots_dir=plots_dir)
 		self._load_experiment_config()
 
 	def _load_experiment_config(self):
 		"""Read experiment-specific parameters from the synthetic_adaptive section."""
-		import math
-		with open(CONFIG_PATH) as f:
+		with open(self.config_path) as f:
 			raw = yaml.safe_load(f)
 		exp_cfg = raw.get("synthetic_adaptive", {})
 
 		self.n_of_agents: int = exp_cfg.get("n_of_agents", 2)
 		self.n_of_tool_calls_per_agent: int = exp_cfg.get("n_of_tool_calls_per_agent", 2)
 		self.tool_execution_duration_time: int = exp_cfg.get("tool_execution_duration_time", 2)
-		self.n_runs: int = exp_cfg.get("n_runs", 1)
-
-		max_backend_slots: int = exp_cfg.get("max_backend_slots", 8)
-		max_exp = int(math.log2(max_backend_slots))
-		start_exp = 4 if max_backend_slots >= 16 else 0
-		# e.g. max_backend_slots=8  → [1, 2, 4, 8]
-		#      max_backend_slots=64 → [16, 32, 64]
-		self.backend_slots_sweep: List[int] = [2**i for i in range(start_exp, max_exp + 1)]
+		self.backend_slots_sweep: List[int] = exp_cfg.get("backend_slots_sweep", [1, 2, 4, 8])
 
 	async def _run_scaling_experiment(
 		self,
 		scaling_type: ScalingType,
 		scaling_key: str,
-		index: Optional[int] = None,
+		sweep_index: Optional[int] = None,
+		iter_index: Optional[int] = None,
 	) -> None:
-		"""
-		Generic scaling experiment runner.
-
-		Args:
-			scaling_type: "strong" (fixed workload) or "weak" (workload scales with p)
-			scaling_key: Grouping key written into each JSONL record (e.g. "strong_scaling-op-work")
-			index: If set, run only backend_slots_sweep[index] (dragon mode).
-		"""
 		cfg = self.benchmark_config
 		logger.info(f"=== {scaling_type.upper()} SCALING: {cfg.run_name} ===")
 
@@ -89,8 +73,8 @@ class SynthethicAdaptive(BaseExperiment):
 		if scaling_type == "strong":
 			sweep = list(reversed(sweep))
 
-		if index is not None:
-			sweep = [sweep[index]]
+		if sweep_index is not None:
+			sweep = [sweep[sweep_index]]
 
 		# Weak scaling: workload scales with p — precompute per-slot ratio
 		p_max = max(self.backend_slots_sweep)
@@ -115,33 +99,33 @@ class SynthethicAdaptive(BaseExperiment):
 				engine_id=cfg.engine_id,
 			)
 
-			for run_index in range(self.n_runs):
-				if self.n_runs > 1:
-					logger.info(f"  Run {run_index + 1}/{self.n_runs} for p={backend_slots}")
+			run_index = iter_index if iter_index is not None else 0
+			if iter_index is not None:
+				logger.info(f"  Run iter={run_index} for p={backend_slots}")
 
-				workload_result: WorkloadResult = await self.run_workload(
-					workload_orchestrator=LangraphWorkload,
-					workload_config=workload_config,
-				)
-				logger.debug(f"Workload result is: {workload_result}")
+			workload_result: WorkloadResult = await self.run_workload(
+				workload_orchestrator=LangraphWorkload,
+				workload_config=workload_config,
+			)
+			logger.debug(f"Workload result is: {workload_result}")
 
-				record = BenchmarkedRecord(
-					run_name=cfg.run_name,
-					run_description=cfg.run_description,
-					workload_id=cfg.workload_id,
-					engine_id=cfg.engine_id,
-					n_of_agents=n_agents,
-					n_of_tool_calls_per_agent=n_tool_calls,
-					n_of_backend_slots=backend_slots,
-					tool_execution_duration_time=self.tool_execution_duration_time,
-					scaling_key=scaling_key,
-					run_index=run_index,
-					total_makespan=workload_result.total_makespan,
-					events=workload_result.events,
-				).model_dump(mode="json")
-				logger.debug(f"Writing to logs: {record}")
+			record = BenchmarkedRecord(
+				run_name=cfg.run_name,
+				run_description=cfg.run_description,
+				workload_id=cfg.workload_id,
+				engine_id=cfg.engine_id,
+				n_of_agents=n_agents,
+				n_of_tool_calls_per_agent=n_tool_calls,
+				n_of_backend_slots=backend_slots,
+				tool_execution_duration_time=self.tool_execution_duration_time,
+				scaling_key=scaling_key,
+				run_index=run_index,
+				total_makespan=workload_result.total_makespan,
+				events=workload_result.events,
+			).model_dump(mode="json")
+			logger.debug(f"Writing to logs: {record}")
 
-				self.store_data_to_disk(record)
+			self.store_data_to_disk(record)
 
 			send_discord_notifaction(
 				f"🚀 **Iteration Complete: {cfg.run_name}**\n"
@@ -150,26 +134,28 @@ class SynthethicAdaptive(BaseExperiment):
 				f"⏱️ **Makespan:** `{workload_result.total_makespan:.2f}s`"
 			)
 
-	async def run_strong_scaling(self, index: Optional[int] = None) -> None:
+	async def run_strong_scaling(
+		self, sweep_index: Optional[int] = None, iter_index: Optional[int] = None
+	) -> None:
 		"""Strong scaling: fixed workload, increasing backend slots."""
 		is_noop = self.tool_execution_duration_time == 0
 		scaling_key = f"strong_scaling-{'noop' if is_noop else 'op'}-work"
-		await self._run_scaling_experiment("strong", scaling_key, index=index)
+		await self._run_scaling_experiment("strong", scaling_key, sweep_index=sweep_index, iter_index=iter_index)
 
-	async def run_weak_scaling(self, index: Optional[int] = None) -> None:
+	async def run_weak_scaling(
+		self, sweep_index: Optional[int] = None, iter_index: Optional[int] = None
+	) -> None:
 		"""Weak scaling: workload scales proportionally with backend slots."""
 		is_noop = self.tool_execution_duration_time == 0
 		scaling_key = f"weak_scaling-{'noop' if is_noop else 'op'}-work"
-		await self._run_scaling_experiment("weak", scaling_key, index=index)
+		await self._run_scaling_experiment("weak", scaling_key, sweep_index=sweep_index, iter_index=iter_index)
 
-	async def run_experiment(self, index: Optional[int] = None) -> None:
-		"""Run both strong and weak scaling.
-
-		When index is provided (dragon mode), runs only backend_slots_sweep[index]
-		for both scaling types in a single dragon invocation.
-		"""
-		await self.run_strong_scaling(index=index)
-		await self.run_weak_scaling(index=index)
+	async def run_experiment(
+		self, sweep_index: Optional[int] = None, iter_index: Optional[int] = None
+	) -> None:
+		"""Run both strong and weak scaling."""
+		await self.run_strong_scaling(sweep_index=sweep_index, iter_index=iter_index)
+		await self.run_weak_scaling(sweep_index=sweep_index, iter_index=iter_index)
 
 	def generate_plots(self, data: List[Dict[Any, Any]]):
 		self.plotter.plot_results(data=data)

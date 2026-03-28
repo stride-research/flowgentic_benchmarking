@@ -40,14 +40,16 @@ class FlowGenticBenchmarkManager:
 			self.benchmark_config,
 			meta["data_dir"],
 			meta["plots_dir"],
+			self.io_utils.config_path,
 		)
 
 	async def run_registered_experiments(
 		self,
 		experiment_name: Optional[str] = None,
 		sweep_index: Optional[int] = None,
+		iter_index: Optional[int] = None,
 	):
-		"""Run experiments. Optionally filter to a single experiment and/or sweep point."""
+		"""Run experiments."""
 		targets = (
 			{experiment_name: self.experiments[experiment_name]}
 			if experiment_name
@@ -56,16 +58,20 @@ class FlowGenticBenchmarkManager:
 
 		for name, _ in targets.items():
 			started_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-			sweep_note = f" (sweep-index={sweep_index})" if sweep_index is not None else ""
+			note = ""
+			if sweep_index is not None:
+				note += f" sweep={sweep_index}"
+			if iter_index is not None:
+				note += f" iter={iter_index}"
 			DiscordNotifier().send_discord_notification(
 				msg=(
 					f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-					f"🚀 **Starting:** `{name}`{sweep_note} at `{started_at}`\n"
+					f"🚀 **Starting:** `{name}`{note} at `{started_at}`\n"
 					f"**engine:** `{self.benchmark_config.engine_id}`"
 				)
 			)
 			instance = self._make_instance(name)
-			await instance.run_experiment(index=sweep_index)
+			await instance.run_experiment(sweep_index=sweep_index, iter_index=iter_index)
 
 	def finalize_experiments(self, experiment_name: Optional[str] = None):
 		"""Generate plots from existing data.jsonl without re-running."""
@@ -81,17 +87,31 @@ class FlowGenticBenchmarkManager:
 async def main():
 	parser = argparse.ArgumentParser(description="FlowGentic benchmark runner")
 	parser.add_argument(
+		"--config",
+		type=Path,
+		default=Path("config.yml"),
+		dest="config_path",
+		help="Path to config.yml (default: config.yml in CWD)",
+	)
+	parser.add_argument(
 		"--experiment",
 		type=str,
 		default=None,
-		help="Run a specific experiment by name (default: all)",
+		help="Experiment name (required unless --plots-only)",
 	)
 	parser.add_argument(
 		"--sweep-index",
 		type=int,
 		default=None,
 		dest="sweep_index",
-		help="Run only the Nth sweep point within the experiment (dragon mode: one call per point)",
+		help="Run only the Nth entry in the sweep list",
+	)
+	parser.add_argument(
+		"--iter",
+		type=int,
+		default=None,
+		dest="iter_index",
+		help="Run only this repetition index",
 	)
 	parser.add_argument(
 		"--plots-only",
@@ -100,7 +120,10 @@ async def main():
 	)
 	args = parser.parse_args()
 
-	benchmark = FlowGenticBenchmarkManager()
+	if not args.plots_only and args.experiment is None:
+		parser.error("--experiment is required (use --plots-only without it to regenerate all plots)")
+
+	benchmark = FlowGenticBenchmarkManager(config_path=args.config_path)
 	benchmark.register_experiment("throughput_saturation", ThroughputSaturation)
 	benchmark.register_experiment("syntethic_adaptive", SynthethicAdaptive)
 
@@ -110,6 +133,7 @@ async def main():
 		await benchmark.run_registered_experiments(
 			experiment_name=args.experiment,
 			sweep_index=args.sweep_index,
+			iter_index=args.iter_index,
 		)
 
 

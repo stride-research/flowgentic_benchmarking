@@ -20,6 +20,9 @@ dev = [
     "pytest-cov",
 ]
 
+[tool.setuptools.packages.find]
+include = ["data_generation*"]
+
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"

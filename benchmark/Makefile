@@ -1,4 +1,8 @@
-.PHONY: install format lint docs tests examples-sequential-research examples-sequential-financial examples-supervisor examples-supervisor-sales examples-supervisor-product-research examples-basic examples-parallel-minimal examples-parallel-llm-router examples-mcp-sales-analytics
+.PHONY: install install-benchmark install-all \
+	smoke-throughput smoke-scaling \
+	local-throughput local-scaling local-plots \
+	delta-debug delta-submit delta-plots \
+	cluster-session
 
 .DEFAULT_GOAL:= help
 SHELL := /bin/bash
@@ -30,20 +34,47 @@ install-all: ## Install all dependencies (frameworks + runtimes + dev)
 	uv venv $(VENV_PATH) --python 3.10
 	uv pip install -e ".[dev]"
 
-# 3) Benchmark
-benchmark: ## Run the experiments in the benchmarking
-	$(VENV_ACTIVATE) && python3 -m data_generation.run_experiments
+# ── Phase 1: local smoke test ─────────────────────────────────────────────────
+# One sweep point, one iter. Validates config → workload → JSONL → plots end-to-end.
+smoke-throughput: ## [phase 1] Single-point smoke test for throughput_saturation
+	$(VENV_ACTIVATE) && python -m data_generation.run_experiments \
+		--config scripts/local/config.yml \
+		--experiment throughput_saturation \
+		--sweep-index 0 --iter 0
 
-benchmark-multiple-workloads: ## Run the full benchmark suite with multiple configs
-	$(VENV_ACTIVATE) && python3 -m run_benchmark_suite
+smoke-scaling: ## [phase 1] Single-point smoke test for syntethic_adaptive
+	$(VENV_ACTIVATE) && python -m data_generation.run_experiments \
+		--config scripts/local/config.yml \
+		--experiment syntethic_adaptive \
+		--sweep-index 0 --iter 0
 
-sbatch-start: ## Starts batch for testing
-	sbatch tests/benchmark/submit_delta.sh
+# ── Phase 2: full local run ───────────────────────────────────────────────────
+# All sweep points, configurable iters (default 1). Use ITERS=3 for error bars.
+local-throughput: ## [phase 2] Full local throughput sweep  (ITERS=1)
+	$(VENV_ACTIVATE) && python scripts/local/run.py \
+		--experiment throughput_saturation --iters $(or $(ITERS),1)
 
-cluster-debug: ## Starts interactive debug session
-	salloc --account=bebo-delta-gpu \
-		--partition=gpuA100x4-interactive \
-		--nodes=2 \
-		--ntasks-per-node=4 \
-		--gpus-per-node=1 \
+local-scaling: ## [phase 2] Full local scaling sweep  (ITERS=1)
+	$(VENV_ACTIVATE) && python scripts/local/run.py \
+		--experiment syntethic_adaptive --iters $(or $(ITERS),1)
+
+local-plots: ## [phase 2] Regenerate local plots from existing data
+	$(VENV_ACTIVATE) && python scripts/local/run.py --plots-only
+
+# ── Phase 3: Delta smoke test (run on cluster, not locally) ──────────────────
+delta-debug: ## [phase 3] Submit lightweight smoke test job to Delta
+	sbatch scripts/delta/debug.sh
+
+cluster-session: ## [phase 3] Start interactive CPU session on Delta for setup/debugging
+	salloc --account=bebo-delta-cpu \
+		--partition=cpu-interactive \
+		--nodes=1 --ntasks-per-node=4 \
 		--time=01:00:00
+
+# ── Phase 4: full Delta job ───────────────────────────────────────────────────
+delta-submit: ## [phase 4] Submit full benchmark job to Delta
+	sbatch scripts/delta/submit.sh
+
+delta-plots: ## [phase 4] Regenerate Delta plots from existing data (no dragon needed)
+	$(VENV_ACTIVATE) && python -m data_generation.run_experiments \
+		--config scripts/delta/config.yml --plots-only
