@@ -59,6 +59,7 @@ class SynthethicAdaptive(BaseExperiment):
 		self.n_of_agents: int = exp_cfg.get("n_of_agents", 2)
 		self.n_of_tool_calls_per_agent: int = exp_cfg.get("n_of_tool_calls_per_agent", 2)
 		self.tool_execution_duration_time: int = exp_cfg.get("tool_execution_duration_time", 2)
+		self.n_runs: int = exp_cfg.get("n_runs", 1)
 
 		max_backend_slots: int = exp_cfg.get("max_backend_slots", 8)
 		max_exp = int(math.log2(max_backend_slots))
@@ -114,28 +115,33 @@ class SynthethicAdaptive(BaseExperiment):
 				engine_id=cfg.engine_id,
 			)
 
-			workload_result: WorkloadResult = await self.run_workload(
-				workload_orchestrator=LangraphWorkload,
-				workload_config=workload_config,
-			)
-			logger.debug(f"Workload result is: {workload_result}")
+			for run_index in range(self.n_runs):
+				if self.n_runs > 1:
+					logger.info(f"  Run {run_index + 1}/{self.n_runs} for p={backend_slots}")
 
-			record = BenchmarkedRecord(
-				run_name=cfg.run_name,
-				run_description=cfg.run_description,
-				workload_id=cfg.workload_id,
-				engine_id=cfg.engine_id,
-				n_of_agents=n_agents,
-				n_of_tool_calls_per_agent=n_tool_calls,
-				n_of_backend_slots=backend_slots,
-				tool_execution_duration_time=self.tool_execution_duration_time,
-				scaling_key=scaling_key,
-				total_makespan=workload_result.total_makespan,
-				events=workload_result.events,
-			).model_dump(mode="json")
-			logger.debug(f"Writing to logs: {record}")
+				workload_result: WorkloadResult = await self.run_workload(
+					workload_orchestrator=LangraphWorkload,
+					workload_config=workload_config,
+				)
+				logger.debug(f"Workload result is: {workload_result}")
 
-			self.store_data_to_disk(record)
+				record = BenchmarkedRecord(
+					run_name=cfg.run_name,
+					run_description=cfg.run_description,
+					workload_id=cfg.workload_id,
+					engine_id=cfg.engine_id,
+					n_of_agents=n_agents,
+					n_of_tool_calls_per_agent=n_tool_calls,
+					n_of_backend_slots=backend_slots,
+					tool_execution_duration_time=self.tool_execution_duration_time,
+					scaling_key=scaling_key,
+					run_index=run_index,
+					total_makespan=workload_result.total_makespan,
+					events=workload_result.events,
+				).model_dump(mode="json")
+				logger.debug(f"Writing to logs: {record}")
+
+				self.store_data_to_disk(record)
 
 			send_discord_notifaction(
 				f"🚀 **Iteration Complete: {cfg.run_name}**\n"

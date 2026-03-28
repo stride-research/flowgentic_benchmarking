@@ -22,6 +22,32 @@ def _bxp_stats(box: Dict[str, float]) -> Dict[str, Any]:
 	}
 
 
+def _aggregate_records_by_agents(
+	records: List[Dict[str, Any]],
+) -> tuple:
+	"""
+	Group records by n_agents and compute mean ± std of throughput.
+
+	Returns:
+		(n_agents_vals, mean_throughputs, std_throughputs, representative_records)
+	"""
+	from collections import defaultdict
+
+	groups: Dict[int, List] = defaultdict(list)
+	for r in records:
+		groups[r["n_agents"]].append(r)
+
+	agents = sorted(groups.keys())
+	means = [float(np.mean([r.get("throughput", 0) for r in groups[n]])) for n in agents]
+	stds = [
+		float(np.std([r.get("throughput", 0) for r in groups[n]], ddof=1))
+		if len(groups[n]) > 1 else 0.0
+		for n in agents
+	]
+	reprs = [groups[n][0] for n in agents]
+	return agents, means, stds, reprs
+
+
 class ThroughputSaturationPlotter(BasePlotter):
 	"""
 	Plots for the FlowGentic coordination throughput saturation experiment.
@@ -53,13 +79,20 @@ class ThroughputSaturationPlotter(BasePlotter):
 		self._plot_overhead_fraction(records)
 
 	def _plot_throughput(self, records: List[Dict[str, Any]]) -> None:
-		"""Throughput (inv/s) vs n_agents."""
+		"""Throughput (inv/s) vs n_agents — aggregates mean ± std across runs."""
 		fig, ax = plt.subplots(figsize=(10, 6))
 
-		n_agents = [r["n_agents"] for r in records]
-		throughputs = [r.get("throughput", 0) for r in records]
+		n_agents, throughputs, throughput_stds, _ = _aggregate_records_by_agents(records)
+		has_errors = any(s > 0 for s in throughput_stds)
 
-		ax.plot(n_agents, throughputs, marker="o", linewidth=2, markersize=8, color="steelblue")
+		if has_errors:
+			ax.errorbar(
+				n_agents, throughputs, yerr=throughput_stds,
+				fmt="o-", linewidth=2, markersize=8, color="steelblue",
+				capsize=4, capthick=1.5, label="Mean ± std",
+			)
+		else:
+			ax.plot(n_agents, throughputs, marker="o", linewidth=2, markersize=8, color="steelblue")
 
 		ax.set_xscale("log", base=2)
 		ax.set_xlabel("Number of Agents (concurrent load)", fontsize=13)

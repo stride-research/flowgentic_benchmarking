@@ -163,6 +163,7 @@ class ThroughputSaturation(BaseExperiment):
 		self.n_of_tool_calls_per_agent: int = exp_cfg.get("n_of_tool_calls_per_agent", 64)
 		self.n_of_backend_slots: int = exp_cfg.get("n_of_backend_slots", 512)
 		self.tool_execution_duration_time: int = exp_cfg.get("tool_execution_duration_time", 0)
+		self.n_runs: int = exp_cfg.get("n_runs", 1)
 
 	async def run_experiment(self, index: Optional[int] = None) -> None:
 		"""
@@ -193,30 +194,35 @@ class ThroughputSaturation(BaseExperiment):
 				engine_id=self.benchmark_config.engine_id,
 			)
 
-			workload_result: WorkloadResult = await self.run_workload(
-				workload_orchestrator=LangraphWorkload,
-				workload_config=workload_config,
-			)
+			for run_index in range(self.n_runs):
+				if self.n_runs > 1:
+					logger.info(f"  Run {run_index + 1}/{self.n_runs} for n_agents={n_agents}")
 
-			metrics = extract_invocation_metrics(workload_result.events)
+				workload_result: WorkloadResult = await self.run_workload(
+					workload_orchestrator=LangraphWorkload,
+					workload_config=workload_config,
+				)
 
-			logger.info(
-				f"    throughput={metrics.get('throughput', 0):.2f} inv/s  "
-				f"t_run={metrics.get('t_run', 0):.3f}s  "
-				f"d_overhead_mean={metrics.get('d_overhead_mean', 0)*1000:.2f}ms  "
-				f"d_total_p95={metrics.get('d_total_p95', 0)*1000:.2f}ms"
-			)
+				metrics = extract_invocation_metrics(workload_result.events)
 
-			record = {
-				"n_agents": n_agents,
-				"n_of_tool_calls_per_agent": self.n_of_tool_calls_per_agent,
-				"n_of_backend_slots": self.n_of_backend_slots,
-				"tool_execution_duration_time": self.tool_execution_duration_time,
-				"total_invocations": total_invocations,
-				"total_makespan": workload_result.total_makespan,
-				**metrics,
-			}
-			self.store_data_to_disk(record)
+				logger.info(
+					f"    throughput={metrics.get('throughput', 0):.2f} inv/s  "
+					f"t_run={metrics.get('t_run', 0):.3f}s  "
+					f"d_overhead_mean={metrics.get('d_overhead_mean', 0)*1000:.2f}ms  "
+					f"d_total_p95={metrics.get('d_total_p95', 0)*1000:.2f}ms"
+				)
+
+				record = {
+					"n_agents": n_agents,
+					"n_of_tool_calls_per_agent": self.n_of_tool_calls_per_agent,
+					"n_of_backend_slots": self.n_of_backend_slots,
+					"tool_execution_duration_time": self.tool_execution_duration_time,
+					"total_invocations": total_invocations,
+					"run_index": run_index,
+					"total_makespan": workload_result.total_makespan,
+					**metrics,
+				}
+				self.store_data_to_disk(record)
 
 	def generate_plots(self, data: List[Dict[Any, Any]]):
 		self.plotter.plot_results(data)

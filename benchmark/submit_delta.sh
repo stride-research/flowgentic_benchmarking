@@ -62,11 +62,11 @@ cat config.yml
 N_OF_AGENTS_SWEEP=(1 2 4 8 16 32 64 128 256 512)
 N_SWEEP=${#N_OF_AGENTS_SWEEP[@]}
 
-for index in $(seq 0 $((N_SWEEP - 1))); do
-    echo "=== dragon: throughput_saturation index=$index (n_agents=${N_OF_AGENTS_SWEEP[$index]}) ==="
+for sweep_index in $(seq 0 $((N_SWEEP - 1))); do
+    echo "=== dragon: throughput_saturation sweep-index=$sweep_index (n_agents=${N_OF_AGENTS_SWEEP[$sweep_index]}) ==="
     dragon data_generation/run_experiments.py \
         --experiment throughput_saturation \
-        --index "$index"
+        --sweep-index "$sweep_index"
 done
 
 # ── Generate plots (no dragon needed) ─────────────────────────────────────────

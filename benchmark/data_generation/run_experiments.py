@@ -45,9 +45,9 @@ class FlowGenticBenchmarkManager:
 	async def run_registered_experiments(
 		self,
 		experiment_name: Optional[str] = None,
-		index: Optional[int] = None,
+		sweep_index: Optional[int] = None,
 	):
-		"""Run experiments. Optionally filter to a single experiment and/or sweep index."""
+		"""Run experiments. Optionally filter to a single experiment and/or sweep point."""
 		targets = (
 			{experiment_name: self.experiments[experiment_name]}
 			if experiment_name
@@ -56,16 +56,16 @@ class FlowGenticBenchmarkManager:
 
 		for name, _ in targets.items():
 			started_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-			index_note = f" (index={index})" if index is not None else ""
+			sweep_note = f" (sweep-index={sweep_index})" if sweep_index is not None else ""
 			DiscordNotifier().send_discord_notification(
 				msg=(
 					f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-					f"🚀 **Starting:** `{name}`{index_note} at `{started_at}`\n"
+					f"🚀 **Starting:** `{name}`{sweep_note} at `{started_at}`\n"
 					f"**engine:** `{self.benchmark_config.engine_id}`"
 				)
 			)
 			instance = self._make_instance(name)
-			await instance.run_experiment(index=index)
+			await instance.run_experiment(index=sweep_index)
 
 	def finalize_experiments(self, experiment_name: Optional[str] = None):
 		"""Generate plots from existing data.jsonl without re-running."""
@@ -87,10 +87,11 @@ async def main():
 		help="Run a specific experiment by name (default: all)",
 	)
 	parser.add_argument(
-		"--index",
+		"--sweep-index",
 		type=int,
 		default=None,
-		help="Run only sweep[index] within the experiment (dragon mode)",
+		dest="sweep_index",
+		help="Run only the Nth sweep point within the experiment (dragon mode: one call per point)",
 	)
 	parser.add_argument(
 		"--plots-only",
@@ -108,7 +109,7 @@ async def main():
 	else:
 		await benchmark.run_registered_experiments(
 			experiment_name=args.experiment,
-			index=args.index,
+			sweep_index=args.sweep_index,
 		)
 
 

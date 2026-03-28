@@ -57,6 +57,8 @@ class BenchmarkedRecord(BaseModel):
 	tool_execution_duration_time: int
 	# JSONL grouping key — used by multi-sub-experiment types (e.g. "strong_scaling-op-work")
 	scaling_key: Optional[str] = None
+	# Repetition index — 0-based, used when n_runs > 1 to get mean ± std in plots
+	run_index: int = 0
 	# Results
 	total_makespan: float
 	events: List[Dict[str, Any]]
