@@ -2,7 +2,7 @@ import logging
 import yaml
 import numpy as np
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from data_generation.experiments.base.base_experiment import (
 	BaseExperiment,
@@ -12,7 +12,6 @@ from data_generation.experiments.throughput_saturation.utils.plots import (
 )
 from data_generation.utils.schemas import (
 	BenchmarkConfig,
-	EngineIDs,
 	WorkloadConfig,
 	WorkloadResult,
 )
@@ -152,7 +151,6 @@ class ThroughputSaturation(BaseExperiment):
 		super().__init__(data_dir, plots_dir)
 		self.benchmark_config = benchmark_config
 		self.plotter = ThroughputSaturationPlotter(plots_dir=plots_dir)
-		self.results: Dict[str, Any] = {}
 		self._load_experiment_config()
 
 	def _load_experiment_config(self):
@@ -166,18 +164,24 @@ class ThroughputSaturation(BaseExperiment):
 		self.n_of_backend_slots: int = exp_cfg.get("n_of_backend_slots", 512)
 		self.tool_execution_duration_time: int = exp_cfg.get("tool_execution_duration_time", 0)
 
-	async def run_experiment(self) -> None:
-		workloads_results = []
+	async def run_experiment(self, index: Optional[int] = None) -> None:
+		"""
+		Run the throughput saturation sweep.
+
+		Args:
+			index: If provided, run only agent_sweep[index] (dragon mode — one
+			       dragon invocation per sweep point). If None, run all points
+			       sequentially (local mode).
+		"""
+		sweep = [self.agent_sweep[index]] if index is not None else self.agent_sweep
 
 		logger.info("=== FLOWGENTIC THROUGHPUT SATURATION (noop tools) ===")
 		logger.info(
-			f"agent_sweep={self.agent_sweep}  "
-			f"k={self.n_of_tool_calls_per_agent}  "
-			f"S={self.n_of_backend_slots}  "
-			f"D={self.tool_execution_duration_time}"
+			f"sweep={sweep}  k={self.n_of_tool_calls_per_agent}  "
+			f"S={self.n_of_backend_slots}  D={self.tool_execution_duration_time}"
 		)
 
-		for n_agents in self.agent_sweep:
+		for n_agents in sweep:
 			total_invocations = n_agents * self.n_of_tool_calls_per_agent
 			logger.info(f"\n--- n_agents={n_agents}  total_invocations={total_invocations} ---")
 
@@ -186,7 +190,7 @@ class ThroughputSaturation(BaseExperiment):
 				n_of_tool_calls_per_agent=self.n_of_tool_calls_per_agent,
 				n_of_backend_slots=self.n_of_backend_slots,
 				tool_execution_duration_time=self.tool_execution_duration_time,
-				engine_id=EngineIDs.ASYNCFLOW.value,
+				engine_id=self.benchmark_config.engine_id,
 			)
 
 			workload_result: WorkloadResult = await self.run_workload(
@@ -203,21 +207,16 @@ class ThroughputSaturation(BaseExperiment):
 				f"d_total_p95={metrics.get('d_total_p95', 0)*1000:.2f}ms"
 			)
 
-			workloads_results.append(
-				{
-					"n_agents": n_agents,
-					"n_of_tool_calls_per_agent": self.n_of_tool_calls_per_agent,
-					"n_of_backend_slots": self.n_of_backend_slots,
-					"tool_execution_duration_time": self.tool_execution_duration_time,
-					"total_invocations": total_invocations,
-					"total_makespan": workload_result.total_makespan,
-					**metrics,
-				}
-			)
+			record = {
+				"n_agents": n_agents,
+				"n_of_tool_calls_per_agent": self.n_of_tool_calls_per_agent,
+				"n_of_backend_slots": self.n_of_backend_slots,
+				"tool_execution_duration_time": self.tool_execution_duration_time,
+				"total_invocations": total_invocations,
+				"total_makespan": workload_result.total_makespan,
+				**metrics,
+			}
+			self.store_data_to_disk(record)
 
-			# Incremental save after each iteration
-			self.results["throughput_saturation"] = workloads_results
-			self.store_data_to_disk(self.results)
-
-	def generate_plots(self, data: Dict[Any, Any]):
+	def generate_plots(self, data: List[Dict[Any, Any]]):
 		self.plotter.plot_results(data)

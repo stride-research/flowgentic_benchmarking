@@ -39,8 +39,8 @@ class ThroughputSaturationPlotter(BasePlotter):
 		super().__init__()
 		self.plots_dir = plots_dir
 
-	def plot_results(self, data: Dict[Any, Any]) -> None:
-		records: List[Dict[str, Any]] = data.get("throughput_saturation", [])
+	def plot_results(self, data: List[Dict[str, Any]]) -> None:
+		records: List[Dict[str, Any]] = data
 		if not records:
 			logger.warning("No throughput_saturation data to plot.")
 			return

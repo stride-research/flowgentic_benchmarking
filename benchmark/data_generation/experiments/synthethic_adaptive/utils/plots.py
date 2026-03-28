@@ -107,19 +107,22 @@ class SyntheticAdaptivePlotter(BasePlotter):
 		"""Set the plots directory after initialization."""
 		self.plots_dir = plots_dir
 
-	def plot_results(self, data: Dict[Any, Any]) -> None:
+	def plot_results(self, data: List[Dict[Any, Any]]) -> None:
 		"""
-		Generate all plots from experiment data.
+		Generate all plots from experiment data (JSONL list of records).
 
-		Data structure expected:
-		{
-			'strong_scaling-op-work': [...],  # List of BenchmarkedRecord dicts
-			'weak_scaling-...': [...],        # Future
-		}
+		Records are grouped by their scaling_key field:
+		  'strong_scaling-op-work', 'weak_scaling-op-work', etc.
 		"""
-		logger.debug(f"Received this data: {data}")
+		from collections import defaultdict
+		logger.debug(f"Received {len(data)} records")
 
-		for experiment_key, records in data.items():
+		grouped: Dict[str, List] = defaultdict(list)
+		for record in data:
+			key = record.get("scaling_key", "unknown")
+			grouped[key].append(record)
+
+		for experiment_key, records in grouped.items():
 			if experiment_key.startswith("strong_scaling"):
 				self._plot_strong_scaling(experiment_key, records)
 				self._plot_overhead(experiment_key, records, "strong_scaling")

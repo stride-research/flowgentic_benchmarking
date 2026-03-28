@@ -1,6 +1,6 @@
 from enum import Enum
 from pydantic import BaseModel
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 
 class TaskState(BaseModel):
@@ -13,26 +13,17 @@ class WorkloadType(str, Enum):
 
 
 class EngineIDs(str, Enum):
-	ASYNCFLOW = "asyncflow"
-	PARSL = "parsl"
+	ASYNCFLOW_LOCAL = "asyncflow_local"
+	ASYNCFLOW_DRAGON = "asyncflow_dragon"
 
 
 class BenchmarkConfig(BaseModel):
-	"""Configuration for benchmark runs"""
+	"""Global run metadata parsed from the top-level config.yml fields."""
 
-	# 1) Defined in config.yml and not modifed
 	run_name: str
 	run_description: str
-
 	workload_id: str
-
-	n_of_agents: int
-	n_of_tool_calls_per_agent: int
-	n_of_backend_slots: int
-
-	# 2) Edited by the benchmarking program
-	workload_type: WorkloadType = WorkloadType.FIXED_AGENTS_VARY_TOOLS
-	tool_execution_duration_time: int
+	engine_id: str = EngineIDs.ASYNCFLOW_LOCAL.value
 
 
 class WorkloadConfig(BaseModel):
@@ -40,7 +31,7 @@ class WorkloadConfig(BaseModel):
 	n_of_tool_calls_per_agent: int
 	n_of_backend_slots: int
 	tool_execution_duration_time: int
-	engine_id: EngineIDs
+	engine_id: str
 
 
 class WorkloadResult(BaseModel):
@@ -50,8 +41,22 @@ class WorkloadResult(BaseModel):
 	events: List[Dict[str, Any]]  # Profiling events from the engine
 
 
-class BenchmarkedRecord(BenchmarkConfig):
-	"""Full experiment record: metadata plus workload results."""
+class BenchmarkedRecord(BaseModel):
+	"""Full experiment record: global metadata + per-iteration workload config + results."""
 
+	# Global run metadata
+	run_name: str
+	run_description: str
+	workload_id: str
+	engine_id: str
+	# Per-iteration workload configuration (set by each experiment)
+	n_of_agents: int
+	n_of_tool_calls_per_agent: int
+	n_of_backend_slots: int
+	workload_type: WorkloadType = WorkloadType.FIXED_AGENTS_VARY_TOOLS
+	tool_execution_duration_time: int
+	# JSONL grouping key — used by multi-sub-experiment types (e.g. "strong_scaling-op-work")
+	scaling_key: Optional[str] = None
+	# Results
 	total_makespan: float
-	events: List[Dict[str, Any]]  # Profiling events from the engine
+	events: List[Dict[str, Any]]

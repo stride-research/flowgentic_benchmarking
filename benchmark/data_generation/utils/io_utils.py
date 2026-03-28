@@ -22,30 +22,13 @@ class IOUtils:
 			return yaml.safe_load(file)
 
 	def get_run_config(self):
-		"""Parses the config.yml"""
-		# Read the yaml
+		"""Parses the top-level generic fields from config.yml."""
 		config_yaml = self._load_config(self.config_path)
-
-		# Create object out of config
-		run_name = config_yaml["run_name"]
-		run_description = config_yaml["run_description"]
-
-		workload_id = config_yaml["workload_id"]
-
-		environment = config_yaml["environment"]
-		n_of_agents = int(environment["n_of_agents"])
-		n_of_tool_calls_per_agent = int(environment["n_of_tool_calls_per_agent"])
-		n_of_backend_slots = int(environment["n_of_backend_slots"])
-		tool_execution_duration_time = int(environment["tool_execution_duration_time"])
-
 		return BenchmarkConfig(
-			run_name=run_name,
-			run_description=run_description,
-			workload_id=workload_id,
-			n_of_agents=n_of_agents,
-			n_of_tool_calls_per_agent=n_of_tool_calls_per_agent,
-			n_of_backend_slots=n_of_backend_slots,
-			tool_execution_duration_time=tool_execution_duration_time,
+			run_name=config_yaml["run_name"],
+			run_description=config_yaml["run_description"],
+			workload_id=config_yaml["workload_id"],
+			engine_id=config_yaml.get("engine_id", "asyncflow_local"),
 		)
 
 	def _create_core_directories(self, run_configuration_name: str):

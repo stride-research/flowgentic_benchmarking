@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 import json
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 import logging
 
 from data_generation.utils.schemas import WorkloadConfig, WorkloadResult
@@ -42,12 +42,12 @@ class BaseExperiment(ABC):
 		return WorkloadResult(total_makespan=makespan, events=events)
 
 	@abstractmethod
-	async def run_experiment(self) -> None:
-		"""Run experiment. Data should be written to disk incrementally."""
+	async def run_experiment(self, index: Optional[int] = None) -> None:
+		"""Run experiment. Pass index to run a single sweep point (dragon mode)."""
 		pass
 
 	@abstractmethod
-	def generate_plots(self, data: Dict[Any, Any]):
+	def generate_plots(self, data: List[Dict[Any, Any]]):
 		pass
 
 	def finalize(self):
@@ -55,13 +55,16 @@ class BaseExperiment(ABC):
 		data = self.load_data_from_disk()
 		self.generate_plots(data)
 
-	def store_data_to_disk(self, data: Dict[Any, Any]):
-		"""Store results to disk."""
-		with open(self.data_dir / "data.json", "w") as f:
-			json.dump(data, f, indent=2)
-		logger.info(f"✓ Results saved to {self.data_dir}")
+	def store_data_to_disk(self, record: Dict[str, Any]) -> None:
+		"""Append a single record to data.jsonl (one JSON object per line)."""
+		with open(self.data_dir / "data.jsonl", "a") as f:
+			f.write(json.dumps(record) + "\n")
+		logger.info(f"✓ Record appended to {self.data_dir / 'data.jsonl'}")
 
-	def load_data_from_disk(self) -> Dict[Any, Any]:
-		"""Load results from disk."""
-		with open(self.data_dir / "data.json", "r") as f:
-			return json.load(f)
+	def load_data_from_disk(self) -> List[Dict[Any, Any]]:
+		"""Load all records from data.jsonl."""
+		path = self.data_dir / "data.jsonl"
+		if not path.exists():
+			return []
+		with open(path) as f:
+			return [json.loads(line) for line in f if line.strip()]

@@ -1,37 +1,18 @@
+import argparse
 import asyncio
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Dict, List, Optional
 
-import yaml
-import shutil
-
-from data_generation.experiments.base.base_experiment import (
-	BaseExperiment,
-)
-from data_generation.experiments.synthethic_adaptive.main import (
-	SynthethicAdaptive,
-)
-from data_generation.experiments.throughput_saturation.main import (
-	ThroughputSaturation,
-)
-from data_generation.utils.io_utils import IOUtils
-from data_generation.utils.schemas import (
-	BenchmarkConfig,
-	EngineIDs,
-	WorkloadConfig,
-	WorkloadResult,
-	WorkloadType,
-)
-from data_generation.workload.base_workload import BaseWorkload
-from data_generation.workload.utils.engine import resolve_engine
-from data_generation.workload.langgraph import LangraphWorkload
-
-from data_generation.utils.io_utils import DiscordNotifier
-
+from data_generation.experiments.base.base_experiment import BaseExperiment
+from data_generation.experiments.synthethic_adaptive.main import SynthethicAdaptive
+from data_generation.experiments.throughput_saturation.main import ThroughputSaturation
+from data_generation.utils.io_utils import DiscordNotifier, IOUtils
 
 logger = logging.getLogger(__name__)
+
+logging.basicConfig(level=logging.INFO)
 
 
 class FlowGenticBenchmarkManager:
@@ -40,12 +21,9 @@ class FlowGenticBenchmarkManager:
 	def __init__(self, config_path: Path = Path("./config.yml")):
 		self.io_utils = IOUtils(config_path)
 		self.benchmark_config = self.io_utils.benchmark_config
-		self.results: Dict[str, List[Dict]] = {}
-		self.experiments: Dict[str, BaseExperiment] = {}
+		self.experiments: Dict[str, dict] = {}
 
-	def register_experiment(
-		self, experiment_name: str, experiment_class: BaseExperiment
-	):
+	def register_experiment(self, experiment_name: str, experiment_class):
 		data_dir, plots_dir = self.io_utils.create_experiment_directory(
 			experiment_name=experiment_name
 		)
@@ -56,43 +34,82 @@ class FlowGenticBenchmarkManager:
 		}
 		return data_dir, plots_dir
 
-	async def run_registerd_experiments(self):
-		for experiment_name, experiment_metadata in self.experiments.items():
+	def _make_instance(self, experiment_name: str) -> BaseExperiment:
+		meta = self.experiments[experiment_name]
+		return meta["experiment_class"](
+			self.benchmark_config,
+			meta["data_dir"],
+			meta["plots_dir"],
+		)
+
+	async def run_registered_experiments(
+		self,
+		experiment_name: Optional[str] = None,
+		index: Optional[int] = None,
+	):
+		"""Run experiments. Optionally filter to a single experiment and/or sweep index."""
+		targets = (
+			{experiment_name: self.experiments[experiment_name]}
+			if experiment_name
+			else self.experiments
+		)
+
+		for name, _ in targets.items():
 			started_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-			config_json = self.benchmark_config.model_dump_json(indent=2)
-			msg = (
-				f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-				f"🚀 **Starting experiment**\n"
-				f"**Experiment:** `{experiment_name}`\n"
-				f"**Started at:** `{started_at}`\n"
-				f"**Config:**\n```json\n{config_json}\n```"
+			index_note = f" (index={index})" if index is not None else ""
+			DiscordNotifier().send_discord_notification(
+				msg=(
+					f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+					f"🚀 **Starting:** `{name}`{index_note} at `{started_at}`\n"
+					f"**engine:** `{self.benchmark_config.engine_id}`"
+				)
 			)
-			DiscordNotifier().send_discord_notification(msg=msg)
-			experiment_class = experiment_metadata.get("experiment_class")
-			data_dir = experiment_metadata.get("data_dir")
-			plots_dir = experiment_metadata.get("plots_dir")
-			experiment_instance: BaseExperiment = experiment_class(
-				self.benchmark_config, data_dir, plots_dir
-			)
-			# Run experiment (writes to disk incrementally)
-			await experiment_instance.run_experiment()
-			# Read from disk and generate plots
-			experiment_instance.finalize()
+			instance = self._make_instance(name)
+			await instance.run_experiment(index=index)
+
+	def finalize_experiments(self, experiment_name: Optional[str] = None):
+		"""Generate plots from existing data.jsonl without re-running."""
+		targets = (
+			{experiment_name: self.experiments[experiment_name]}
+			if experiment_name
+			else self.experiments
+		)
+		for name, _ in targets.items():
+			self._make_instance(name).finalize()
 
 
 async def main():
-	"""Run all benchmarks"""
+	parser = argparse.ArgumentParser(description="FlowGentic benchmark runner")
+	parser.add_argument(
+		"--experiment",
+		type=str,
+		default=None,
+		help="Run a specific experiment by name (default: all)",
+	)
+	parser.add_argument(
+		"--index",
+		type=int,
+		default=None,
+		help="Run only sweep[index] within the experiment (dragon mode)",
+	)
+	parser.add_argument(
+		"--plots-only",
+		action="store_true",
+		help="Skip execution and only regenerate plots from existing data",
+	)
+	args = parser.parse_args()
 
 	benchmark = FlowGenticBenchmarkManager()
-
-	# Throughput saturation experiment
 	benchmark.register_experiment("throughput_saturation", ThroughputSaturation)
-
-	# Experiment 2
 	benchmark.register_experiment("syntethic_adaptive", SynthethicAdaptive)
 
-	# Execution of experiments
-	await benchmark.run_registerd_experiments()
+	if args.plots_only:
+		benchmark.finalize_experiments(experiment_name=args.experiment)
+	else:
+		await benchmark.run_registered_experiments(
+			experiment_name=args.experiment,
+			index=args.index,
+		)
 
 
 if __name__ == "__main__":
