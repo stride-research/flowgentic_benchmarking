@@ -1,9 +1,11 @@
 from abc import ABC, abstractmethod
 import json
+import tarfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 import logging
 
+from data_generation.utils.io_utils import DiscordNotifier
 from data_generation.utils.schemas import WorkloadConfig, WorkloadResult
 from data_generation.workload.base_workload import BaseWorkload
 from data_generation.workload.utils.engine import resolve_engine
@@ -72,9 +74,21 @@ class BaseExperiment(ABC):
 		logger.info(f"✓ Record appended to {self.data_dir / 'data.jsonl'}")
 
 	def load_data_from_disk(self) -> List[Dict[Any, Any]]:
-		"""Load all records from data.jsonl."""
+		"""Load all records from data.jsonl, compress, and send via Discord."""
 		path = self.data_dir / "data.jsonl"
 		if not path.exists():
 			return []
 		with open(path) as f:
-			return [json.loads(line) for line in f if line.strip()]
+			data = [json.loads(line) for line in f if line.strip()]
+
+		tar_path = self.data_dir / "data.tar.gz"
+		with tarfile.open(tar_path, "w:gz") as tar:
+			tar.add(path, arcname=path.name)
+		logger.info(f"✓ Compressed data to {tar_path}")
+
+		DiscordNotifier().send_discord_notification(
+			msg=f"Experiment data ready: {self.data_dir.parent.name}/{self.data_dir.name}",
+			file_path=str(tar_path),
+		)
+
+		return data

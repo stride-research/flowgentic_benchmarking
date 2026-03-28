@@ -414,7 +414,7 @@ class SyntheticAdaptivePlotter(BasePlotter):
 			)
 			try:
 				self.discord_notifier.send_discord_notification(
-					msg=plot_description, image_path=str(plot_path)
+					msg=plot_description, file_path=str(plot_path)
 				)
 				logger.info(f"Sent plot to Discord: {plot_path}")
 			except Exception as e:
@@ -737,7 +737,7 @@ class SyntheticAdaptivePlotter(BasePlotter):
 			)
 			try:
 				self.discord_notifier.send_discord_notification(
-					msg=plot_description, image_path=str(plot_path)
+					msg=plot_description, file_path=str(plot_path)
 				)
 				logger.info(f"Sent plot to Discord: {plot_path}")
 			except Exception as e:
