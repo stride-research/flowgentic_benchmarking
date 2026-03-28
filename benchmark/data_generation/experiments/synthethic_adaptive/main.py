@@ -51,19 +51,27 @@ class SynthethicAdaptive(BaseExperiment):
 
 	def _load_experiment_config(self):
 		"""Read experiment-specific parameters from the synthetic_adaptive section."""
+		import math
 		with open(CONFIG_PATH) as f:
 			raw = yaml.safe_load(f)
 		exp_cfg = raw.get("synthetic_adaptive", {})
 
 		self.n_of_agents: int = exp_cfg.get("n_of_agents", 2)
 		self.n_of_tool_calls_per_agent: int = exp_cfg.get("n_of_tool_calls_per_agent", 2)
-		self.n_of_backend_slots: int = exp_cfg.get("n_of_backend_slots", 3)
 		self.tool_execution_duration_time: int = exp_cfg.get("tool_execution_duration_time", 2)
+
+		max_backend_slots: int = exp_cfg.get("max_backend_slots", 8)
+		max_exp = int(math.log2(max_backend_slots))
+		start_exp = 4 if max_backend_slots >= 16 else 0
+		# e.g. max_backend_slots=8  → [1, 2, 4, 8]
+		#      max_backend_slots=64 → [16, 32, 64]
+		self.backend_slots_sweep: List[int] = [2**i for i in range(start_exp, max_exp + 1)]
 
 	async def _run_scaling_experiment(
 		self,
 		scaling_type: ScalingType,
 		scaling_key: str,
+		index: Optional[int] = None,
 	) -> None:
 		"""
 		Generic scaling experiment runner.
@@ -71,22 +79,24 @@ class SynthethicAdaptive(BaseExperiment):
 		Args:
 			scaling_type: "strong" (fixed workload) or "weak" (workload scales with p)
 			scaling_key: Grouping key written into each JSONL record (e.g. "strong_scaling-op-work")
+			index: If set, run only backend_slots_sweep[index] (dragon mode).
 		"""
 		cfg = self.benchmark_config
-		scaling_label = scaling_type.upper()
-		logger.info(f"=== {scaling_label} SCALING: {cfg.run_name} ===")
+		logger.info(f"=== {scaling_type.upper()} SCALING: {cfg.run_name} ===")
 
-		start = 0 if self.n_of_backend_slots < 4 else 4
-		backend_slots_options = [2**i for i in range(start, self.n_of_backend_slots + 1)]
+		sweep = self.backend_slots_sweep
+		if scaling_type == "strong":
+			sweep = list(reversed(sweep))
 
-		# Weak scaling ratio info
-		p_max = max(backend_slots_options)
+		if index is not None:
+			sweep = [sweep[index]]
+
+		# Weak scaling: workload scales with p — precompute per-slot ratio
+		p_max = max(self.backend_slots_sweep)
 		reference_N = self.n_of_agents * self.n_of_tool_calls_per_agent
 		workload_per_slot = max(1, reference_N // p_max)
 
-		options = list(reversed(backend_slots_options)) if scaling_type == "strong" else backend_slots_options
-
-		for backend_slots in options:
+		for backend_slots in sweep:
 			logger.info(f"\n--- Testing p={backend_slots} backend slots ---")
 
 			if scaling_type == "strong":
@@ -134,22 +144,26 @@ class SynthethicAdaptive(BaseExperiment):
 				f"⏱️ **Makespan:** `{workload_result.total_makespan:.2f}s`"
 			)
 
-	async def run_strong_scaling(self) -> None:
+	async def run_strong_scaling(self, index: Optional[int] = None) -> None:
 		"""Strong scaling: fixed workload, increasing backend slots."""
 		is_noop = self.tool_execution_duration_time == 0
 		scaling_key = f"strong_scaling-{'noop' if is_noop else 'op'}-work"
-		await self._run_scaling_experiment("strong", scaling_key)
+		await self._run_scaling_experiment("strong", scaling_key, index=index)
 
-	async def run_weak_scaling(self) -> None:
+	async def run_weak_scaling(self, index: Optional[int] = None) -> None:
 		"""Weak scaling: workload scales proportionally with backend slots."""
 		is_noop = self.tool_execution_duration_time == 0
 		scaling_key = f"weak_scaling-{'noop' if is_noop else 'op'}-work"
-		await self._run_scaling_experiment("weak", scaling_key)
+		await self._run_scaling_experiment("weak", scaling_key, index=index)
 
 	async def run_experiment(self, index: Optional[int] = None) -> None:
-		"""Run both strong and weak scaling. index is unused (kept for interface compatibility)."""
-		await self.run_strong_scaling()
-		await self.run_weak_scaling()
+		"""Run both strong and weak scaling.
+
+		When index is provided (dragon mode), runs only backend_slots_sweep[index]
+		for both scaling types in a single dragon invocation.
+		"""
+		await self.run_strong_scaling(index=index)
+		await self.run_weak_scaling(index=index)
 
 	def generate_plots(self, data: List[Dict[Any, Any]]):
 		self.plotter.plot_results(data=data)

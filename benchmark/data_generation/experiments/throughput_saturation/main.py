@@ -159,7 +159,7 @@ class ThroughputSaturation(BaseExperiment):
 			raw = yaml.safe_load(f)
 		exp_cfg = raw.get("throughput_saturation", {})
 
-		self.agent_sweep: List[int] = exp_cfg.get("agent_sweep", [1, 2, 4, 8, 16, 32, 64, 128])
+		self.n_of_agents_sweep: List[int] = exp_cfg.get("n_of_agents_sweep", [1, 2, 4, 8, 16, 32, 64, 128])
 		self.n_of_tool_calls_per_agent: int = exp_cfg.get("n_of_tool_calls_per_agent", 64)
 		self.n_of_backend_slots: int = exp_cfg.get("n_of_backend_slots", 512)
 		self.tool_execution_duration_time: int = exp_cfg.get("tool_execution_duration_time", 0)
@@ -169,11 +169,11 @@ class ThroughputSaturation(BaseExperiment):
 		Run the throughput saturation sweep.
 
 		Args:
-			index: If provided, run only agent_sweep[index] (dragon mode — one
+			index: If provided, run only n_of_agents_sweep[index] (dragon mode — one
 			       dragon invocation per sweep point). If None, run all points
 			       sequentially (local mode).
 		"""
-		sweep = [self.agent_sweep[index]] if index is not None else self.agent_sweep
+		sweep = [self.n_of_agents_sweep[index]] if index is not None else self.n_of_agents_sweep
 
 		logger.info("=== FLOWGENTIC THROUGHPUT SATURATION (noop tools) ===")
 		logger.info(

@@ -21,10 +21,17 @@ echo "=== Starting on $(hostname) at $(date) ==="
 echo "=== Working directory: $(pwd) ==="
 echo "=== SLURM_JOB_ID=$SLURM_JOB_ID  SLURM_NNODES=$SLURM_NNODES ==="
 
+# ── Cray MPI ABI — must be loaded before activating venv ──────────────────────
+module load cray-mpich-abi
+
 # ── Activate venv (already installed on shared fs) ────────────────────────────
 source .venv/bin/activate
 echo "Python: $(python --version)"
 echo "Dragon: $(which dragon)"
+
+# ── Configure Dragon to use Cray libfabric (fast interconnect) ────────────────
+# Required once per job; harmless to re-run.
+dragon-config add --ofi-runtime-lib=/opt/cray/libfabric/1.22.0/lib64
 
 # ── Load .env (Discord webhook etc.) ──────────────────────────────────────────
 set -a
@@ -43,7 +50,7 @@ throughput_saturation:
   tool_execution_duration_time: 0
   n_of_tool_calls_per_agent: 64
   n_of_backend_slots: 512
-  agent_sweep: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
+  n_of_agents_sweep: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
 EOF
 
 echo "=== Config ==="
@@ -52,11 +59,11 @@ cat config.yml
 # ── Run each sweep point as a separate dragon invocation ──────────────────────
 # Dragon does not release pool memory until its main process exits.
 # One dragon call per index ensures full resource cleanup between points.
-AGENT_SWEEP=(1 2 4 8 16 32 64 128 256 512)
-N_SWEEP=${#AGENT_SWEEP[@]}
+N_OF_AGENTS_SWEEP=(1 2 4 8 16 32 64 128 256 512)
+N_SWEEP=${#N_OF_AGENTS_SWEEP[@]}
 
 for index in $(seq 0 $((N_SWEEP - 1))); do
-    echo "=== dragon: throughput_saturation index=$index (n_agents=${AGENT_SWEEP[$index]}) ==="
+    echo "=== dragon: throughput_saturation index=$index (n_agents=${N_OF_AGENTS_SWEEP[$index]}) ==="
     dragon data_generation/run_experiments.py \
         --experiment throughput_saturation \
         --index "$index"

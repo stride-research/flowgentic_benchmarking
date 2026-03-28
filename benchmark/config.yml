@@ -5,12 +5,12 @@ engine_id: asyncflow_local
 
 synthetic_adaptive:
   n_of_agents: 2
-  n_of_backend_slots: 3
+  max_backend_slots: 8       # sweeps powers of 2 up to this value: [1, 2, 4, 8]
   n_of_tool_calls_per_agent: 2
   tool_execution_duration_time: 2
 
 throughput_saturation:
   tool_execution_duration_time: 0
   n_of_tool_calls_per_agent: 64
-  n_of_backend_slots: 512
-  agent_sweep: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
+  n_of_backend_slots: 512    # fixed — large enough to never bottleneck backend
+  n_of_agents_sweep: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
