@@ -72,7 +72,6 @@ class IOUtils:
 class DiscordNotifier:
 	def __init__(self):
 		self.webhook_url = os.getenv("DISCORD_WEBHOOK")
-
 	def send_discord_notification(self, msg: str, file_path: str = None):
 		if not self.webhook_url:
 			return None

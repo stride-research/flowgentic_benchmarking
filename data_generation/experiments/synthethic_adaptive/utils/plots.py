@@ -214,7 +214,7 @@ class SyntheticAdaptivePlotter(BasePlotter):
 
 		# Calculate speedup and efficiency using relative parallelism
 		p_min = backend_slots[0]
-		t_baseline = makespans[0]  # Baseline: makespan with smallest slot count
+		t_baseline = makespans[0]
 		speedups = [t_baseline / t_p for t_p in makespans]
 		relative_p = [p / p_min for p in backend_slots]
 		efficiencies = [s / rp for s, rp in zip(speedups, relative_p)]
@@ -240,6 +240,7 @@ class SyntheticAdaptivePlotter(BasePlotter):
 			if isinstance(n_agents, int) and isinstance(n_tools, int)
 			else "?"
 		)
+		n_runs = repr_records[0].get("number_of_runs", 1)
 
 		makespan_subdir = "strong_scaling/makespan"
 		baseline_note = f"p₀={p_min}" if p_min > 1 else ""
@@ -576,35 +577,46 @@ class SyntheticAdaptivePlotter(BasePlotter):
 		]
 
 		self._create_scaling_plot(
-			x_values=metrics["backend_slots"],
+			x_values=backend_slots,
 			y_values=throughputs,
 			title=f"Task Throughput\n{subtitle}",
 			xlabel="Number of Backend Slots (p)",
 			ylabel="Throughput (tasks/second)",
 			filename="throughput.png",
 			subdirectory=throughput_subdir,
+			y_errors=throughput_errors,
 		)
 
 		throughput_per_slot = [
-			t / s if s > 0 else 0 for t, s in zip(throughputs, metrics["backend_slots"])
+			t / s if s > 0 else 0 for t, s in zip(throughputs, backend_slots)
 		]
+		tps_errors = None
+		if throughput_errors is not None:
+			tps_errors = [
+				te / s if s > 0 else 0 for te, s in zip(throughput_errors, backend_slots)
+			]
 		self._create_scaling_plot(
-			x_values=metrics["backend_slots"],
+			x_values=backend_slots,
 			y_values=throughput_per_slot,
 			title=f"Throughput per Backend Slot\n{subtitle}",
 			xlabel="Number of Backend Slots (p)",
 			ylabel="Throughput per Slot (tasks/second/slot)",
 			filename="throughput_per_slot.png",
 			subdirectory=throughput_subdir,
+			y_errors=tps_errors,
 		)
 
 		if throughputs[0] > 0:
 			baseline_throughput = throughputs[0]
 			actual_scaling = [t / baseline_throughput for t in throughputs]
-			ideal_scaling = [float(s) for s in metrics["backend_slots"]]
+			ideal_scaling = [float(s) for s in backend_slots]
+
+			scaling_errors = None
+			if throughput_errors is not None:
+				scaling_errors = [te / baseline_throughput for te in throughput_errors]
 
 			self._create_scaling_plot(
-				x_values=metrics["backend_slots"],
+				x_values=backend_slots,
 				y_values=actual_scaling,
 				title=f"Throughput Scaling Factor\n{subtitle}",
 				xlabel="Number of Backend Slots (p)",
@@ -613,6 +625,7 @@ class SyntheticAdaptivePlotter(BasePlotter):
 				subdirectory=throughput_subdir,
 				ideal_line=ideal_scaling,
 				ideal_label="Ideal (linear)",
+				y_errors=scaling_errors,
 			)
 
 		logger.info(f"Generated throughput plots in {throughput_subdir}/")

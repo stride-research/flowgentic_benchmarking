@@ -61,4 +61,9 @@ class BenchmarkedRecord(BaseModel):
 	run_index: int = 0
 	# Results
 	total_makespan: float
+<<<<<<< HEAD:data_generation/utils/schemas.py
 	events: List[Dict[str, Any]]
+=======
+	events: List[Dict[str, Any]]  # Profiling events from the engine
+	run_index: int = 0
+>>>>>>> main:benchmark/data_generation/utils/schemas.py
