@@ -3,7 +3,7 @@ import asyncio
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from data_generation.experiments.base.base_experiment import BaseExperiment
 from data_generation.experiments.synthethic_adaptive.main import SynthethicAdaptive
@@ -45,35 +45,30 @@ class FlowGenticBenchmarkManager:
 
 	async def run_registered_experiments(
 		self,
-		experiment_name: Optional[str] = None,
-		sweep_index: Optional[int] = None,
-		iter_index: Optional[int] = None,
+		experiment_name: str,
+		sweep_index: int,
+		iter_index: int,
 	):
-		"""Run experiments."""
-		targets = (
-			{experiment_name: self.experiments[experiment_name]}
-			if experiment_name
-			else self.experiments
-		)
-
-		for name, _ in targets.items():
-			started_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-			note = ""
-			if sweep_index is not None:
-				note += f" sweep={sweep_index}"
-			if iter_index is not None:
-				note += f" iter={iter_index}"
-			DiscordNotifier().send_discord_notification(
-				msg=(
-					f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-					f"🚀 **Starting:** `{name}`{note} at `{started_at}`\n"
-					f"**engine:** `{self.benchmark_config.engine_id}`"
-				)
+		"""Run a single sweep point of a single experiment."""
+		cfg = self.benchmark_config
+		started_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+		DiscordNotifier().send_discord_notification(
+			msg=(
+				f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+				f"🚀 **Starting** `{experiment_name}`\n"
+				f"```\n"
+				f"run      : {cfg.run_name}\n"
+				f"engine   : {cfg.engine_id}\n"
+				f"sweep    : {sweep_index}\n"
+				f"iter     : {iter_index}\n"
+				f"started  : {started_at}\n"
+				f"```"
 			)
-			instance = self._make_instance(name)
-			await instance.run_experiment(sweep_index=sweep_index, iter_index=iter_index)
+		)
+		instance = self._make_instance(experiment_name)
+		await instance.run_experiment(sweep_index=sweep_index, iter_index=iter_index)
 
-	def finalize_experiments(self, experiment_name: Optional[str] = None):
+	def finalize_experiments(self, experiment_name: str = None):
 		"""Generate plots from existing data.jsonl without re-running."""
 		targets = (
 			{experiment_name: self.experiments[experiment_name]}
@@ -104,14 +99,14 @@ async def main():
 		type=int,
 		default=None,
 		dest="sweep_index",
-		help="Run only the Nth entry in the sweep list",
+		help="Index into the sweep list",
 	)
 	parser.add_argument(
 		"--iter",
 		type=int,
-		default=None,
+		default=0,
 		dest="iter_index",
-		help="Run only this repetition index",
+		help="Repetition index",
 	)
 	parser.add_argument(
 		"--plots-only",
@@ -120,9 +115,6 @@ async def main():
 	)
 	args = parser.parse_args()
 
-	if not args.plots_only and args.experiment is None:
-		parser.error("--experiment is required (use --plots-only without it to regenerate all plots)")
-
 	benchmark = FlowGenticBenchmarkManager(config_path=args.config_path)
 	benchmark.register_experiment("throughput_saturation", ThroughputSaturation)
 	benchmark.register_experiment("syntethic_adaptive", SynthethicAdaptive)
@@ -130,6 +122,8 @@ async def main():
 	if args.plots_only:
 		benchmark.finalize_experiments(experiment_name=args.experiment)
 	else:
+		if args.experiment is None or args.sweep_index is None:
+			parser.error("--experiment, --sweep-index are all required (use --plots-only to regenerate plots)")
 		await benchmark.run_registered_experiments(
 			experiment_name=args.experiment,
 			sweep_index=args.sweep_index,

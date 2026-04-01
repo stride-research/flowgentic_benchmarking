@@ -1,13 +1,14 @@
 """
-Patch Dragon's slurm.py safely:
-- Replaces --ntasks with --ntasks-per-node=1
-- Adds --overlap
-- Backs up original slurm.py
+Patch Dragon's slurm.py for NCSA Delta:
+- Replaces --ntasks={nnodes} with --ntasks-per-node=1
+- Adds --overlap flag
+- Backs up original on first run, restores from backup on every run (idempotent)
 - Deletes __pycache__ to force recompilation
 """
 
 import os
 import shutil
+
 
 def patch_slurm_file():
     try:
@@ -17,81 +18,71 @@ def patch_slurm_file():
         print("[ERROR] Could not find Dragon slurm module.")
         return
 
-    # Backup original
     backup_path = slurm_path + ".bak"
+
     if not os.path.exists(backup_path):
         shutil.copy(slurm_path, backup_path)
         print(f"[INFO] Backup created at {backup_path}")
     else:
-        print(f"[INFO] Backup already exists at {backup_path}")
+        shutil.copy(backup_path, slurm_path)
+        print(f"[INFO] Restored original from {backup_path}")
 
-    # Read original file
     with open(slurm_path, "r") as f:
-        lines = f.readlines()
+        content = f.read()
 
-    new_lines = []
-    inside_get_wlm = False
+    OLD_SRUN_CMD = (
+        'SRUN_COMMAND_LINE = "srun --nodes={nnodes} --ntasks={nnodes} --cpu_bind=none -u -l -W 0"'
+    )
+    NEW_SRUN_CMD = (
+        'SRUN_COMMAND_LINE = (\n'
+        '        "srun "\n'
+        '        "--nodes={nnodes} "\n'
+        '        "--ntasks-per-node=1 "\n'
+        '        "--cpu_bind=none "\n'
+        '        "--overlap "\n'
+        '        "-u -l -W 0"\n'
+        '    )'
+    )
 
-    for line in lines:
-        stripped = line.strip()
+    OLD_BE_ARGS = (
+        '        slurm_launch_be_args = [\n'
+        '            "srun",\n'
+        '            f"--nodes={args_map[\'nnodes\']}",\n'
+        '            f"--ntasks={args_map[\'nnodes\']}",\n'
+        '            "--cpu_bind=none",\n'
+        '            f"--nodelist={args_map[\'nodelist\']}",\n'
+        '        ]'
+    )
+    NEW_BE_ARGS = (
+        '        slurm_launch_be_args = [\n'
+        '            "srun",\n'
+        '            f"--nodes={args_map[\'nnodes\']}",\n'
+        '            "--ntasks-per-node=1",\n'
+        '            "--cpu_bind=none",\n'
+        '            "--overlap",\n'
+        '        ]'
+    )
 
-        # Patch SRUN_COMMAND_LINE inside class
-        if stripped.startswith("SRUN_COMMAND_LINE"):
-            indent = line[:line.find("SRUN_COMMAND_LINE")]
-            new_lines.append(
-                indent + 'SRUN_COMMAND_LINE = (\n'
-                + indent + '    "srun "\n'
-                + indent + '    "--nodes={nnodes} "\n'
-                + indent + '    "--ntasks-per-node=1 "\n'
-                + indent + '    "--cpu_bind=none "\n'
-                + indent + '    "--overlap "\n'
-                + indent + '    "-u -l -W 0"\n'
-                + indent + ')\n'
-            )
-            continue
+    if OLD_SRUN_CMD not in content:
+        print("[WARN] SRUN_COMMAND_LINE not found in original — already patched or file changed?")
+    else:
+        content = content.replace(OLD_SRUN_CMD, NEW_SRUN_CMD)
 
-        # Patch _get_wlm_launch_be_args method
-        if stripped.startswith("def _get_wlm_launch_be_args"):
-            inside_get_wlm = True
-            indent = line[:line.find("def")]
-            new_lines.append(line)  # keep method definition line
-            # insert new method body
-            method_indent = indent + " " * 4
-            new_lines.append(method_indent + "slurm_launch_be_args = [\n")
-            new_lines.append(method_indent + '    "srun",\n')
-            new_lines.append(method_indent + '    f"--nodes={args_map[\'nnodes\']}",\n')
-            new_lines.append(method_indent + '    "--ntasks-per-node=1",\n')
-            new_lines.append(method_indent + '    "--cpu_bind=none",\n')
-            new_lines.append(method_indent + '    "--overlap",\n')
-            new_lines.append(method_indent + "]\n")
-            new_lines.append(method_indent + "return slurm_launch_be_args + launch_args\n")
-            continue
+    if OLD_BE_ARGS not in content:
+        print("[WARN] _get_wlm_launch_be_args body not found — already patched or file changed?")
+    else:
+        content = content.replace(OLD_BE_ARGS, NEW_BE_ARGS)
 
-        # Skip original method body lines
-        if inside_get_wlm:
-            if stripped == "" or stripped.startswith("return") or stripped.startswith("slurm_launch_be_args"):
-                continue
-            if stripped == "":
-                inside_get_wlm = False
-                continue
-            continue
-
-        # Keep other lines
-        new_lines.append(line)
-
-    # Write patched file
     with open(slurm_path, "w") as f:
-        f.writelines(new_lines)
+        f.write(content)
 
     print(f"[SUCCESS] Dragon slurm.py patched at {slurm_path}")
 
-    # Delete __pycache__ folder to force recompilation
     pycache_dir = os.path.join(os.path.dirname(slurm_path), "__pycache__")
     if os.path.exists(pycache_dir):
         shutil.rmtree(pycache_dir)
         print(f"[INFO] Removed __pycache__ at {pycache_dir}")
-    else:
-        print(f"[INFO] No __pycache__ found at {pycache_dir}")
+
 
 if __name__ == "__main__":
     patch_slurm_file()

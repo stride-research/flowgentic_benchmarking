@@ -2,7 +2,7 @@ import logging
 import yaml
 import numpy as np
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from data_generation.experiments.base.base_experiment import (
 	BaseExperiment,
@@ -10,6 +10,7 @@ from data_generation.experiments.base.base_experiment import (
 from data_generation.experiments.throughput_saturation.utils.plots import (
 	ThroughputSaturationPlotter,
 )
+from data_generation.utils.io_utils import DiscordNotifier
 from data_generation.utils.schemas import (
 	BenchmarkConfig,
 	WorkloadConfig,
@@ -168,58 +169,69 @@ class ThroughputSaturation(BaseExperiment):
 
 	async def run_experiment(
 		self,
-		sweep_index: Optional[int] = None,
-		iter_index: Optional[int] = None,
+		sweep_index: int,
+		iter_index: int,
 	) -> None:
-		sweep = [self.n_of_agents_sweep[sweep_index]] if sweep_index is not None else self.n_of_agents_sweep
+		n_agents = self.n_of_agents_sweep[sweep_index]
+		total_invocations = n_agents * self.n_of_tool_calls_per_agent
 
 		logger.info("=== FLOWGENTIC THROUGHPUT SATURATION (noop tools) ===")
 		logger.info(
-			f"sweep={sweep}  k={self.n_of_tool_calls_per_agent}  "
-			f"S={self.n_of_backend_slots}  D={self.tool_execution_duration_time}"
+			f"n_agents={n_agents}  k={self.n_of_tool_calls_per_agent}  "
+			f"S={self.n_of_backend_slots}  D={self.tool_execution_duration_time}  "
+			f"iter={iter_index}"
 		)
 
-		for n_agents in sweep:
-			total_invocations = n_agents * self.n_of_tool_calls_per_agent
-			logger.info(f"\n--- n_agents={n_agents}  total_invocations={total_invocations} ---")
+		workload_config = WorkloadConfig(
+			n_of_agents=n_agents,
+			n_of_tool_calls_per_agent=self.n_of_tool_calls_per_agent,
+			n_of_backend_slots=self.n_of_backend_slots,
+			tool_execution_duration_time=self.tool_execution_duration_time,
+			engine_id=self.benchmark_config.engine_id,
+		)
 
-			workload_config = WorkloadConfig(
-				n_of_agents=n_agents,
-				n_of_tool_calls_per_agent=self.n_of_tool_calls_per_agent,
-				n_of_backend_slots=self.n_of_backend_slots,
-				tool_execution_duration_time=self.tool_execution_duration_time,
-				engine_id=self.benchmark_config.engine_id,
+		workload_result: WorkloadResult = await self.run_workload(
+			workload_orchestrator=LangraphWorkload,
+			workload_config=workload_config,
+		)
+
+		metrics = extract_invocation_metrics(workload_result.events)
+
+		logger.info(
+			f"    throughput={metrics.get('throughput', 0):.2f} inv/s  "
+			f"t_run={metrics.get('t_run', 0):.3f}s  "
+			f"d_overhead_mean={metrics.get('d_overhead_mean', 0)*1000:.2f}ms  "
+			f"d_total_p95={metrics.get('d_total_p95', 0)*1000:.2f}ms"
+		)
+
+		record = {
+			"n_agents": n_agents,
+			"n_of_tool_calls_per_agent": self.n_of_tool_calls_per_agent,
+			"n_of_backend_slots": self.n_of_backend_slots,
+			"tool_execution_duration_time": self.tool_execution_duration_time,
+			"total_invocations": total_invocations,
+			"run_index": iter_index,
+			"total_makespan": workload_result.total_makespan,
+			**metrics,
+		}
+		self.store_data_to_disk(record)
+
+		throughput = metrics.get("throughput", 0)
+		d_overhead = metrics.get("d_overhead_mean", 0) * 1000
+		DiscordNotifier().send_discord_notification(
+			msg=(
+				f"✅ **Done** `throughput_saturation`\n"
+				f"```\n"
+				f"agents      : {n_agents}\n"
+				f"calls/agent : {self.n_of_tool_calls_per_agent}\n"
+				f"slots       : {self.n_of_backend_slots}\n"
+				f"iter        : {iter_index}\n"
+				f"makespan    : {workload_result.total_makespan:.2f}s\n"
+				f"throughput  : {throughput:.1f} inv/s\n"
+				f"overhead    : {d_overhead:.2f}ms (mean)\n"
+				f"```"
 			)
-
-			run_index = iter_index if iter_index is not None else 0
-			if iter_index is not None:
-				logger.info(f"  Run iter={run_index} for n_agents={n_agents}")
-
-			workload_result: WorkloadResult = await self.run_workload(
-				workload_orchestrator=LangraphWorkload,
-				workload_config=workload_config,
-			)
-
-			metrics = extract_invocation_metrics(workload_result.events)
-
-			logger.info(
-				f"    throughput={metrics.get('throughput', 0):.2f} inv/s  "
-				f"t_run={metrics.get('t_run', 0):.3f}s  "
-				f"d_overhead_mean={metrics.get('d_overhead_mean', 0)*1000:.2f}ms  "
-				f"d_total_p95={metrics.get('d_total_p95', 0)*1000:.2f}ms"
-			)
-
-			record = {
-				"n_agents": n_agents,
-				"n_of_tool_calls_per_agent": self.n_of_tool_calls_per_agent,
-				"n_of_backend_slots": self.n_of_backend_slots,
-				"tool_execution_duration_time": self.tool_execution_duration_time,
-				"total_invocations": total_invocations,
-				"run_index": run_index,
-				"total_makespan": workload_result.total_makespan,
-				**metrics,
-			}
-			self.store_data_to_disk(record)
+		)
 
 	def generate_plots(self, data: List[Dict[Any, Any]]):
 		self.plotter.plot_results(data)

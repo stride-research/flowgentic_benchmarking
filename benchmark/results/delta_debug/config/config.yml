@@ -1,0 +1,16 @@
+run_name: delta_debug
+run_description: 'Delta batch debug — light sweep, asyncflow_dragon engine'
+workload_id: langgraph_asyncflow
+engine_id: asyncflow_dragon
+
+synthetic_adaptive:
+  n_of_agents: 2
+  backend_slots_sweep: [1, 2, 4, 8]
+  n_of_tool_calls_per_agent: 2
+  tool_execution_duration_time: 1
+
+throughput_saturation:
+  n_of_agents_sweep: [1, 2, 4, 8]
+  n_of_backend_slots: 8
+  n_of_tool_calls_per_agent: 4
+  tool_execution_duration_time: 0   # noop — measures coordination overhead only

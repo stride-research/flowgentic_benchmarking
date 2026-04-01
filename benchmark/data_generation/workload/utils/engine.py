@@ -2,12 +2,14 @@ from concurrent.futures import ProcessPoolExecutor
 from contextlib import asynccontextmanager
 from typing import Any, Callable, Dict, Optional
 
-from radical.asyncflow import LocalExecutionBackend, WorkflowEngine
+from radical.asyncflow import ConcurrentExecutionBackend, WorkflowEngine
 
 from flowgentic.backend_engines.radical_asyncflow import AsyncFlowEngine
 
-import multiprocessing
+import multiprocessing as mp
+import logging
 
+logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def resolve_engine(
@@ -15,28 +17,30 @@ async def resolve_engine(
 	n_of_backend_slots: int,
 	observer: Optional[Callable[[Dict[str, Any]], None]] = None,
 ):
+	logger.debug(f"Using engine: {engine_id}")
 	if engine_id == "asyncflow_local":
-		ctx = multiprocessing.get_context("spawn")
+		ctx = mp.get_context("spawn")
 		executor = ProcessPoolExecutor(max_workers=n_of_backend_slots, mp_context=ctx)
+		flow = None
 		try:
-			backend = await LocalExecutionBackend(executor)
+			backend = await ConcurrentExecutionBackend(executor)
 			flow = await WorkflowEngine.create(backend)
 			yield AsyncFlowEngine(flow, observer=observer)
 		finally:
-			await flow.shutdown()
+			if flow is not None:
+				await flow.shutdown()
 			executor.shutdown(wait=True)
 
 	elif engine_id == "asyncflow_dragon":
-		# Lazy import: Dragon is only available on HPC clusters.
-		# Each dragon invocation creates its own backend, so resources
-		# are fully released when the dragon process exits.
 		from radical.asyncflow import DragonExecutionBackendV3
+		flow = None
 		try:
 			backend = await DragonExecutionBackendV3(num_workers=n_of_backend_slots)
 			flow = await WorkflowEngine.create(backend)
 			yield AsyncFlowEngine(flow, observer=observer)
 		finally:
-			await flow.shutdown()
+			if flow is not None:
+				await flow.shutdown()
 
 	else:
 		raise Exception(f"Didnt match any engine for engine_id: {engine_id}")

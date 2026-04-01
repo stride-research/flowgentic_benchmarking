@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 import json
 import tarfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 import logging
 
 from data_generation.utils.io_utils import DiscordNotifier
@@ -48,14 +48,9 @@ class BaseExperiment(ABC):
 	@abstractmethod
 	async def run_experiment(
 		self,
-		sweep_index: Optional[int] = None,
-		iter_index: Optional[int] = None,
+		sweep_index: int,
+		iter_index: int,
 	) -> None:
-		"""Run the experiment.
-
-		sweep_index: run only this position in the sweep list. None = run all.
-		iter_index:  run only this repetition. None = run once (iter 0).
-		"""
 		pass
 
 	@abstractmethod

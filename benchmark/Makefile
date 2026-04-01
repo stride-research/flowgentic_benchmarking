@@ -1,7 +1,7 @@
 .PHONY: install install-benchmark install-all \
 	smoke-throughput smoke-scaling \
 	local-throughput local-scaling local-plots \
-	delta-debug delta-submit delta-plots \
+	delta-setup delta-debug delta-submit delta-plots \
 	cluster-session
 
 .DEFAULT_GOAL:= help
@@ -34,22 +34,7 @@ install-all: ## Install all dependencies (frameworks + runtimes + dev)
 	uv venv $(VENV_PATH) --python 3.10
 	uv pip install -e ".[dev]"
 
-# ── Phase 1: local smoke test ─────────────────────────────────────────────────
-# One sweep point, one iter. Validates config → workload → JSONL → plots end-to-end.
-smoke-throughput: ## [phase 1] Single-point smoke test for throughput_saturation
-	$(VENV_ACTIVATE) && python -m data_generation.run_experiments \
-		--config scripts/local/config.yml \
-		--experiment throughput_saturation \
-		--sweep-index 0 --iter 0
-
-smoke-scaling: ## [phase 1] Single-point smoke test for syntethic_adaptive
-	$(VENV_ACTIVATE) && python -m data_generation.run_experiments \
-		--config scripts/local/config.yml \
-		--experiment syntethic_adaptive \
-		--sweep-index 0 --iter 0
-
-# ── Phase 2: full local run ───────────────────────────────────────────────────
-# All sweep points, configurable iters (default 1). Use ITERS=3 for error bars.
+# LOCAL
 local-throughput: ## [phase 2] Full local throughput sweep  (ITERS=1)
 	$(VENV_ACTIVATE) && python scripts/local/run.py \
 		--experiment throughput_saturation --iters $(or $(ITERS),1)
@@ -61,17 +46,25 @@ local-scaling: ## [phase 2] Full local scaling sweep  (ITERS=1)
 local-plots: ## [phase 2] Regenerate local plots from existing data
 	$(VENV_ACTIVATE) && python scripts/local/run.py --plots-only
 
-# ── Phase 3: Delta smoke test (run on cluster, not locally) ──────────────────
-delta-debug: ## [phase 3] Submit lightweight smoke test job to Delta
-	sbatch scripts/delta/debug.sh
+# DELTA
+delta-setup: ## [phase 3] One-time Dragon/RHAPSODY setup (run once per venv)
+	bash scripts/delta/utils/setup.sh
+## DEBUG
+### INTERACTIVE
+delta-debug-interactive-job: ## [phase 3] Submit lightweight smoke test job to Delta
+	bash scripts/delta/debug/interactive/debug.sh
 
-cluster-session: ## [phase 3] Start interactive CPU session on Delta for setup/debugging
+delta-debug-interactive-session: ## [phase 3] Start interactive CPU session on Delta for setup/debugging
 	salloc --account=bebo-delta-cpu \
 		--partition=cpu-interactive \
-		--nodes=1 --ntasks-per-node=4 \
+		--nodes=2 \
+		--ntasks-per-node=4 \
 		--time=01:00:00
+### BATCH
+delta-debug-batch-job: ## [phase 3] Submit lightweight smoke test job to Delta
+	sbatch scripts/delta/debug/batch/debug.sh
 
-# ── Phase 4: full Delta job ───────────────────────────────────────────────────
+# FULL JOB
 delta-submit: ## [phase 4] Submit full benchmark job to Delta
 	sbatch scripts/delta/submit.sh
 

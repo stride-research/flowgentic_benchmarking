@@ -84,44 +84,71 @@ def _aggregate_records_by_slots(
 	return backend_slots, mean_makespans, std_makespans, representative_records
 
 
-def _compute_overhead_metrics(records: List[Dict]) -> Dict[str, List]:
+def _compute_overhead_metrics(records: List[Dict]) -> Dict[str, Any]:
 	"""
-	Compute overhead metrics across all records.
+	Compute overhead metrics, aggregated by backend_slots across iterations.
 
-	Returns dict with parallel lists indexed by record:
-	- backend_slots, makespans
-	- total_compilation_time, task_wrap_times, block_wrap_times
-	- exec_durations (list of lists), mean_exec_duration
-	- total_tasks
+	Returns dict with parallel lists indexed by unique slot count:
+	- backend_slots
+	- makespans_mean/std, total_compilation_time_mean/std
+	- task_wrap_times_mean/std, block_wrap_times_mean/std
+	- mean_exec_duration_mean/std
+	- exec_durations (pooled list per slot count, for box plots)
+	- total_tasks_mean
 	"""
-	metrics = {
-		"backend_slots": [],
-		"makespans": [],
-		"total_compilation_time": [],
-		"task_wrap_times": [],
-		"block_wrap_times": [],
-		"exec_durations": [],  # List of lists
-		"mean_exec_duration": [],
-		"total_tasks": [],
-	}
+	from collections import defaultdict
 
+	per_record: Dict[int, List[Dict[str, Any]]] = defaultdict(list)
 	for r in records:
 		durations = _extract_event_durations(r["events"])
-
 		task_wrap_total = sum(durations["task_wrap"])
 		block_wrap_total = sum(durations["block_wrap"])
-		compilation_total = task_wrap_total + block_wrap_total
+		per_record[r["n_of_backend_slots"]].append({
+			"makespan": r["total_makespan"],
+			"compilation": task_wrap_total + block_wrap_total,
+			"task_wrap": task_wrap_total,
+			"block_wrap": block_wrap_total,
+			"exec_durations": durations["task_exec"],
+			"mean_exec": float(np.mean(durations["task_exec"])) if durations["task_exec"] else 0.0,
+			"total_tasks": len(durations["task_exec"]),
+		})
 
-		metrics["backend_slots"].append(r["n_of_backend_slots"])
-		metrics["makespans"].append(r["total_makespan"])
-		metrics["total_compilation_time"].append(compilation_total)
-		metrics["task_wrap_times"].append(task_wrap_total)
-		metrics["block_wrap_times"].append(block_wrap_total)
-		metrics["exec_durations"].append(durations["task_exec"])
-		metrics["mean_exec_duration"].append(
-			np.mean(durations["task_exec"]) if durations["task_exec"] else 0
-		)
-		metrics["total_tasks"].append(len(durations["task_exec"]))
+	def _mean_std(vals):
+		m = float(np.mean(vals))
+		s = float(np.std(vals, ddof=1)) if len(vals) > 1 else 0.0
+		return m, s
+
+	metrics: Dict[str, list] = {
+		"backend_slots": [],
+		"makespans_mean": [], "makespans_std": [],
+		"total_compilation_time_mean": [], "total_compilation_time_std": [],
+		"task_wrap_times_mean": [], "task_wrap_times_std": [],
+		"block_wrap_times_mean": [], "block_wrap_times_std": [],
+		"mean_exec_duration_mean": [], "mean_exec_duration_std": [],
+		"exec_durations": [],
+		"total_tasks_mean": [],
+	}
+
+	for slots in sorted(per_record):
+		group = per_record[slots]
+		metrics["backend_slots"].append(slots)
+
+		for src, dst in [
+			("makespan", "makespans"),
+			("compilation", "total_compilation_time"),
+			("task_wrap", "task_wrap_times"),
+			("block_wrap", "block_wrap_times"),
+			("mean_exec", "mean_exec_duration"),
+		]:
+			m, s = _mean_std([g[src] for g in group])
+			metrics[f"{dst}_mean"].append(m)
+			metrics[f"{dst}_std"].append(s)
+
+		pooled_exec = []
+		for g in group:
+			pooled_exec.extend(g["exec_durations"])
+		metrics["exec_durations"].append(pooled_exec)
+		metrics["total_tasks_mean"].append(float(np.mean([g["total_tasks"] for g in group])))
 
 	return metrics
 
@@ -442,35 +469,35 @@ class SyntheticAdaptivePlotter(BasePlotter):
 		if not records:
 			return
 
-		sorted_records = sorted(records, key=lambda r: r["n_of_backend_slots"])
-		metrics = _compute_overhead_metrics(sorted_records)
+		metrics = _compute_overhead_metrics(records)
 		overhead_subdir = f"{scaling_type}/overhead"
 
-		n_agents = sorted_records[0].get("n_of_agents", "?")
-		n_tools = sorted_records[0].get("n_of_tool_calls_per_agent", "?")
-		subtitle = f"({n_agents} agents, {n_tools} tool calls/agent)"
+		n_agents = records[0].get("n_of_agents", "?")
+		n_tools = records[0].get("n_of_tool_calls_per_agent", "?")
+		n_runs = len(records) // max(len(metrics["backend_slots"]), 1)
+		subtitle = f"({n_agents} agents, {n_tools} tool calls/agent"
+		if n_runs > 1:
+			subtitle += f", {n_runs} runs"
+		subtitle += ")"
 
-		# 1. Total compilation time vs backend slots
-		# INTERPRETATION: Shows setup cost - should be constant regardless of slots
-		# If it increases with slots, there's scaling overhead in wrapping
+		has_errors = any(s > 0 for s in metrics["total_compilation_time_std"])
+
 		self._create_scaling_plot(
 			x_values=metrics["backend_slots"],
-			y_values=[t * 1000 for t in metrics["total_compilation_time"]],  # ms
+			y_values=[t * 1000 for t in metrics["total_compilation_time_mean"]],
 			title=f"Compilation Overhead\n{subtitle}",
 			xlabel="Number of Backend Slots (p)",
 			ylabel="Total Compilation Time (ms)",
 			filename="compilation_total.png",
 			subdirectory=overhead_subdir,
+			y_errors=[s * 1000 for s in metrics["total_compilation_time_std"]] if has_errors else None,
 		)
 
-		# 2. Compilation breakdown: task wrapping vs block wrapping
-		# INTERPRETATION: Identifies which component dominates setup cost
-		# High task_wrap suggests many small tasks; high block_wrap suggests complex coordination
 		self._create_stacked_bar_plot(
 			x_values=metrics["backend_slots"],
 			y_stacks={
-				"Task Wrapping": [t * 1000 for t in metrics["task_wrap_times"]],
-				"Block Wrapping": [t * 1000 for t in metrics["block_wrap_times"]],
+				"Task Wrapping": [t * 1000 for t in metrics["task_wrap_times_mean"]],
+				"Block Wrapping": [t * 1000 for t in metrics["block_wrap_times_mean"]],
 			},
 			title=f"Compilation Overhead Breakdown\n{subtitle}",
 			xlabel="Number of Backend Slots (p)",
@@ -479,22 +506,17 @@ class SyntheticAdaptivePlotter(BasePlotter):
 			subdirectory=overhead_subdir,
 		)
 
-		# 3. Mean execution duration per task
-		# INTERPRETATION: Should be ~constant (= configured task duration)
-		# Deviation indicates scheduling/queueing overhead in the execution path
 		self._create_scaling_plot(
 			x_values=metrics["backend_slots"],
-			y_values=metrics["mean_exec_duration"],
+			y_values=metrics["mean_exec_duration_mean"],
 			title=f"Mean Task Execution Duration\n{subtitle}",
 			xlabel="Number of Backend Slots (p)",
 			ylabel="Mean Duration (seconds)",
 			filename="exec_overhead_mean.png",
 			subdirectory=overhead_subdir,
+			y_errors=metrics["mean_exec_duration_std"] if has_errors else None,
 		)
 
-		# 4. Execution duration distribution (box plot)
-		# INTERPRETATION: Variance reveals consistency of task execution
-		# High variance suggests contention or uneven scheduling
 		self._create_box_plot(
 			data=metrics["exec_durations"],
 			labels=[str(s) for s in metrics["backend_slots"]],
@@ -505,16 +527,13 @@ class SyntheticAdaptivePlotter(BasePlotter):
 			subdirectory=overhead_subdir,
 		)
 
-		# 5. Framework overhead as percentage of total makespan
-		# INTERPRETATION: Key metric - how much time is "wasted" on framework overhead
-		# Should decrease with more parallelism as compilation is amortized
-		overhead_pct = [
+		overhead_pct_mean = [
 			(comp / ms) * 100 if ms > 0 else 0
-			for comp, ms in zip(metrics["total_compilation_time"], metrics["makespans"])
+			for comp, ms in zip(metrics["total_compilation_time_mean"], metrics["makespans_mean"])
 		]
 		self._create_scaling_plot(
 			x_values=metrics["backend_slots"],
-			y_values=overhead_pct,
+			y_values=overhead_pct_mean,
 			title=f"Framework Overhead Percentage\n{subtitle}",
 			xlabel="Number of Backend Slots (p)",
 			ylabel="Overhead (% of makespan)",
@@ -540,24 +559,22 @@ class SyntheticAdaptivePlotter(BasePlotter):
 		if not records:
 			return
 
-		sorted_records = sorted(records, key=lambda r: r["n_of_backend_slots"])
-		metrics = _compute_overhead_metrics(sorted_records)
+		metrics = _compute_overhead_metrics(records)
 		throughput_subdir = f"{scaling_type}/throughput"
 
-		n_agents = sorted_records[0].get("n_of_agents", "?")
-		n_tools = sorted_records[0].get("n_of_tool_calls_per_agent", "?")
-		subtitle = f"({n_agents} agents, {n_tools} tool calls/agent)"
+		n_agents = records[0].get("n_of_agents", "?")
+		n_tools = records[0].get("n_of_tool_calls_per_agent", "?")
+		n_runs = len(records) // max(len(metrics["backend_slots"]), 1)
+		subtitle = f"({n_agents} agents, {n_tools} tool calls/agent"
+		if n_runs > 1:
+			subtitle += f", {n_runs} runs"
+		subtitle += ")"
 
-		# Calculate throughput metrics
-		# throughput = total_tasks / makespan
 		throughputs = [
 			n / ms if ms > 0 else 0
-			for n, ms in zip(metrics["total_tasks"], metrics["makespans"])
+			for n, ms in zip(metrics["total_tasks_mean"], metrics["makespans_mean"])
 		]
 
-		# 1. Aggregate throughput vs backend slots
-		# INTERPRETATION: Shows system capacity - should increase with slots
-		# Flattening indicates saturation or bottleneck
 		self._create_scaling_plot(
 			x_values=metrics["backend_slots"],
 			y_values=throughputs,
@@ -568,9 +585,6 @@ class SyntheticAdaptivePlotter(BasePlotter):
 			subdirectory=throughput_subdir,
 		)
 
-		# 2. Throughput per slot (utilization efficiency)
-		# INTERPRETATION: Measures per-slot productivity
-		# Decreasing values indicate diminishing returns from adding slots
 		throughput_per_slot = [
 			t / s if s > 0 else 0 for t, s in zip(throughputs, metrics["backend_slots"])
 		]
@@ -584,9 +598,6 @@ class SyntheticAdaptivePlotter(BasePlotter):
 			subdirectory=throughput_subdir,
 		)
 
-		# 3. Throughput scaling factor: actual vs ideal
-		# INTERPRETATION: Compares actual scaling to theoretical linear scaling
-		# Gap represents parallelization inefficiency (Amdahl's law effects)
 		if throughputs[0] > 0:
 			baseline_throughput = throughputs[0]
 			actual_scaling = [t / baseline_throughput for t in throughputs]
