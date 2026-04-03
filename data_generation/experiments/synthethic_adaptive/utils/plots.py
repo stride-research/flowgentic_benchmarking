@@ -261,6 +261,7 @@ class SyntheticAdaptivePlotter(BasePlotter):
 			ideal_line=relative_p,
 			ideal_label="Ideal (linear)",
 			y_errors=speedup_errors,
+			log_y=True,
 		)
 
 		self._create_scaling_plot(
@@ -362,6 +363,7 @@ class SyntheticAdaptivePlotter(BasePlotter):
 			ideal_line=relative_p,
 			ideal_label="Ideal (linear)",
 			y_errors=speedup_errors,
+			log_y=True,
 		)
 
 		logger.info(f"Generated weak scaling makespan plots in {makespan_subdir}/")
@@ -379,12 +381,15 @@ class SyntheticAdaptivePlotter(BasePlotter):
 		ideal_label: str = "Ideal",
 		y_max: Optional[float] = None,
 		y_errors: Optional[List[float]] = None,
+		log_y: bool = False,
 	) -> None:
 		"""Create a single scaling plot with optional ideal reference line and error bars."""
 		fig, ax = plt.subplots(figsize=(8, 6))
 
 		# Set logarithmic x-axis, then pin ticks to exact data points only
 		ax.set_xscale("log")
+		if log_y:
+			ax.set_yscale("log")
 		ax.xaxis.set_major_locator(mticker.FixedLocator(x_values))
 		ax.xaxis.set_major_formatter(
 			mticker.FixedFormatter([str(int(x)) for x in x_values])
@@ -414,10 +419,13 @@ class SyntheticAdaptivePlotter(BasePlotter):
 		ax.grid(True, alpha=0.3, which="both")
 		ax.legend(loc="best")
 
-		if y_max is not None:
-			ax.set_ylim(bottom=0, top=y_max)
-		else:
-			ax.set_ylim(bottom=0)
+		if not log_y:
+			if y_max is not None:
+				ax.set_ylim(bottom=0, top=y_max)
+			else:
+				ax.set_ylim(bottom=0)
+		elif y_max is not None:
+			ax.set_ylim(top=y_max)
 
 		plt.tight_layout()
 
@@ -562,14 +570,29 @@ class SyntheticAdaptivePlotter(BasePlotter):
 
 		metrics = _compute_overhead_metrics(records)
 		throughput_subdir = f"{scaling_type}/throughput"
+		backend_slots = metrics["backend_slots"]
 
 		n_agents = records[0].get("n_of_agents", "?")
 		n_tools = records[0].get("n_of_tool_calls_per_agent", "?")
-		n_runs = len(records) // max(len(metrics["backend_slots"]), 1)
+		n_runs = len(records) // max(len(backend_slots), 1)
 		subtitle = f"({n_agents} agents, {n_tools} tool calls/agent"
 		if n_runs > 1:
 			subtitle += f", {n_runs} runs"
 		subtitle += ")"
+
+		has_errors = any(s > 0 for s in metrics["makespans_std"])
+		throughput_errors = (
+			[
+				(n / ms**2) * s if ms > 0 else 0
+				for n, ms, s in zip(
+					metrics["total_tasks_mean"],
+					metrics["makespans_mean"],
+					metrics["makespans_std"],
+				)
+			]
+			if has_errors
+			else None
+		)
 
 		throughputs = [
 			n / ms if ms > 0 else 0

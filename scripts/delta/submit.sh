@@ -40,7 +40,7 @@ for sweep_index in $(seq 0 $((N_THROUGHPUT - 1))); do
         --iter 0
 done
 
-echo "=== syntethic_adaptive: $N_SYNTHETIC sweep points × $N_ITERS iters ==="¶
+echo "=== syntethic_adaptive: $N_SYNTHETIC sweep points × $N_ITERS iters ==="
 for sweep_index in $(seq 0 $((N_SYNTHETIC - 1))); do
     for iter in $(seq 0 $((N_ITERS - 1))); do
         echo "--- syntethic_adaptive sweep=$sweep_index iter=$iter ---"

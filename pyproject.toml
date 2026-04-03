@@ -10,12 +10,7 @@ dependencies = [
     "academy-py",
     "pyyaml",
     "psutil>=7.2.2",
-<<<<<<< HEAD:pyproject.toml
     "dragonhpc==0.13.1",
-=======
-    #"dragonhpc" # Only when in the cluster
-    "matplotlib>=3.10.8",
->>>>>>> main:benchmark/pyproject.toml
 ]
 
 [project.optional-dependencies]

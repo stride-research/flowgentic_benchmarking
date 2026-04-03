@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from data_generation.experiments.base.base_plots import BasePlotter
+from data_generation.utils.io_utils import DiscordNotifier
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +65,7 @@ class ThroughputSaturationPlotter(BasePlotter):
 	def __init__(self, plots_dir: Optional[Path] = None) -> None:
 		super().__init__()
 		self.plots_dir = plots_dir
+		self.discord_notifier = DiscordNotifier()
 
 	def plot_results(self, data: List[Dict[str, Any]]) -> None:
 		records: List[Dict[str, Any]] = data
@@ -110,6 +112,12 @@ class ThroughputSaturationPlotter(BasePlotter):
 			path = self.plots_dir / "throughput_vs_agents.png"
 			fig.savefig(path, dpi=150, bbox_inches="tight")
 			logger.info(f"Saved: {path}")
+			try:
+				self.discord_notifier.send_discord_notification(
+					msg="📊 **throughput_vs_agents.png**", file_path=str(path)
+				)
+			except Exception as e:
+				logger.warning(f"Failed to send plot to Discord: {e}")
 		plt.close(fig)
 
 	def _plot_overhead_breakdown(self, records: List[Dict[str, Any]]) -> None:
@@ -159,6 +167,12 @@ class ThroughputSaturationPlotter(BasePlotter):
 			path = self.plots_dir / "overhead_breakdown.png"
 			fig.savefig(path, dpi=150, bbox_inches="tight")
 			logger.info(f"Saved: {path}")
+			try:
+				self.discord_notifier.send_discord_notification(
+					msg="📊 **overhead_breakdown.png**", file_path=str(path)
+				)
+			except Exception as e:
+				logger.warning(f"Failed to send plot to Discord: {e}")
 		plt.close(fig)
 
 	def _plot_overhead_boxplot(self, records: List[Dict[str, Any]]) -> None:
@@ -195,6 +209,12 @@ class ThroughputSaturationPlotter(BasePlotter):
 			path = self.plots_dir / "d_overhead_boxplot.png"
 			fig.savefig(path, dpi=150, bbox_inches="tight")
 			logger.info(f"Saved: {path}")
+			try:
+				self.discord_notifier.send_discord_notification(
+					msg="📊 **d_overhead_boxplot.png**", file_path=str(path)
+				)
+			except Exception as e:
+				logger.warning(f"Failed to send plot to Discord: {e}")
 		plt.close(fig)
 
 	def _plot_overhead_fraction(self, records: List[Dict[str, Any]]) -> None:
@@ -222,4 +242,10 @@ class ThroughputSaturationPlotter(BasePlotter):
 			path = self.plots_dir / "overhead_fraction.png"
 			fig.savefig(path, dpi=150, bbox_inches="tight")
 			logger.info(f"Saved: {path}")
+			try:
+				self.discord_notifier.send_discord_notification(
+					msg="📊 **overhead_fraction.png**", file_path=str(path)
+				)
+			except Exception as e:
+				logger.warning(f"Failed to send plot to Discord: {e}")
 		plt.close(fig)
