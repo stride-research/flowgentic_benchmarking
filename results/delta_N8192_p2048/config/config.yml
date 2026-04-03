@@ -1,0 +1,16 @@
+run_name: delta_N8192_p2048
+run_description: 'Delta cluster run — N=8192 p=2048, asyncflow_dragon engine'
+workload_id: langgraph_asyncflow
+engine_id: asyncflow_dragon
+
+synthetic_adaptive:
+  n_of_agents: 128
+  backend_slots_sweep: [32, 64, 128, 256, 512, 1024, 2048]
+  n_of_tool_calls_per_agent: 64
+  tool_execution_duration_time: 2
+
+throughput_saturation:
+  n_of_agents_sweep: [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]
+  n_of_backend_slots: 2048
+  n_of_tool_calls_per_agent: 64
+  tool_execution_duration_time: 0   # noop — measures coordination overhead only
